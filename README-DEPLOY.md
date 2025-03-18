@@ -20,6 +20,8 @@ This app uses a PostgreSQL database. For free hosting, you can use Supabase:
 3. Get your PostgreSQL connection string from Supabase dashboard (Settings > Database > Connection String > URI)
 4. Replace the password placeholder with your actual database password
 
+postgresql://postgres:CBZ4vun!kwg!zxg_yqx@db.ddnwakabvndrksgjxrfl.supabase.co:5432/postgres
+
 Supabase's free tier offers:
 - 500 MB database space
 - Unlimited API requests
@@ -57,3 +59,5 @@ Supabase's free tier offers:
 ## Updating your app
 
 Whenever you push changes to your GitHub repository, Vercel will automatically rebuild and deploy your app. 
+
+s
