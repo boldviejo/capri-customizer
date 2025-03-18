@@ -2,7 +2,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": "build",
   "framework": "remix",
-  "environment": {
+  "env": {
     "NODE_ENV": "production"
   }
 } 
