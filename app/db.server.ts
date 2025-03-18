@@ -4,12 +4,19 @@ declare global {
   var prisma: PrismaClient;
 }
 
-if (process.env.NODE_ENV !== "production") {
-  if (!global.prisma) {
-    global.prisma = new PrismaClient();
-  }
-}
+let prisma: PrismaClient;
 
-const prisma: PrismaClient = global.prisma || new PrismaClient();
+if (process.env.NODE_ENV === "production") {
+  // In production, use a new PrismaClient
+  prisma = new PrismaClient();
+} else {
+  // In development, use a cached instance and enable logging
+  if (!global.prisma) {
+    global.prisma = new PrismaClient({
+      log: ['query', 'error', 'warn'],
+    });
+  }
+  prisma = global.prisma;
+}
 
 export default prisma;
