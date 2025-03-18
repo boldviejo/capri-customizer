@@ -17,7 +17,7 @@
     "prisma": "prisma",
     "graphql-codegen": "graphql-codegen",
     "vite": "vite",
-    "vercel-build": "npx prisma migrate deploy && npx prisma generate && npx remix vite:build"
+    "vercel-build": "npx prisma generate && npx remix vite:build"
   },
   "type": "module",
   "engines": {

@@ -1,6 +1,9 @@
 {
-  "buildCommand": "npx prisma migrate deploy && npm run vercel-build",
-  "outputDirectory": "public",
+  "buildCommand": "npm run vercel-build",
+  "outputDirectory": "build",
   "framework": "remix",
-  "installCommand": "npm install"
+  "installCommand": "npm install --no-save --legacy-peer-deps",
+  "env": {
+    "NODE_ENV": "production"
+  }
 } 
