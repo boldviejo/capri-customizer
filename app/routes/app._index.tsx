@@ -1,24 +1,66 @@
 import { useCallback, useState } from "react";
-import { json, type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
-import { Page, Layout, Text, Card, Button, BlockStack, InlineStack, TextField, ColorPicker, hsbToHex, Select } from "@shopify/polaris";
+import { json, type LoaderFunctionArgs, type ActionFunctionArgs } from "@remix-run/node";
+import { useLoaderData, useSubmit } from "@remix-run/react";
+import { Page, Layout, Text, Card, Button, BlockStack, InlineStack, TextField, ColorPicker, hsbToHex, Select, Toast } from "@shopify/polaris";
 
 import { authenticate } from "../shopify.server";
+import prisma from "../db.server";
 
 interface LoaderData {
   productCount: number;
+  customizations: Array<{
+    id: string;
+    text: string;
+    fontFamily: string;
+    fontSize: number;
+    color: string;
+    createdAt: string;
+  }>;
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
+
+  // Get customizations for the current shop
+  const customizations = await prisma.customization.findMany({
+    where: { shop: session.shop },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+  });
 
   return json<LoaderData>({
     productCount: 0,
+    customizations: customizations.map((c: any) => ({
+      ...c,
+      createdAt: c.createdAt.toISOString(),
+      fontSize: Number(c.fontSize)
+    })),
   });
 };
 
+export const action = async ({ request }: ActionFunctionArgs) => {
+  const { session } = await authenticate.admin(request);
+  
+  const formData = await request.formData();
+  const { text, fontFamily, fontSize, color } = Object.fromEntries(formData);
+  
+  // Save the customization to the database
+  const customization = await prisma.customization.create({
+    data: {
+      shop: session.shop,
+      text: String(text),
+      fontFamily: String(fontFamily),
+      fontSize: Number(fontSize),
+      color: String(color),
+    },
+  });
+  
+  return json({ success: true, customization });
+};
+
 export default function Index() {
-  const { productCount } = useLoaderData<LoaderData>();
+  const { customizations } = useLoaderData<LoaderData>();
+  const submit = useSubmit();
   
   // Customizer state
   const [customText, setCustomText] = useState("");
@@ -30,6 +72,7 @@ export default function Index() {
   const [fontSize, setFontSize] = useState("20");
   const [fontFamily, setFontFamily] = useState("Arial");
   const [productPreview, setProductPreview] = useState("");
+  const [showToast, setShowToast] = useState(false);
   
   const fontOptions = [
     {label: "Arial", value: "Arial"},
@@ -66,12 +109,24 @@ export default function Index() {
   }, [customText, fontFamily, fontSize, hexColor]);
   
   const handleSaveCustomization = useCallback(() => {
-    // In a real app, this would save to the database and apply to a product
-    alert("Customization saved! In a real app, this would be applied to a product.");
-  }, []);
+    // Save to the database
+    const formData = new FormData();
+    formData.append("text", customText);
+    formData.append("fontFamily", fontFamily);
+    formData.append("fontSize", fontSize);
+    formData.append("color", hexColor);
+    
+    submit(formData, { method: "post" });
+    setShowToast(true);
+  }, [customText, fontFamily, fontSize, hexColor, submit]);
+
+  const toggleToast = useCallback(() => setShowToast((showToast) => !showToast), []);
 
   return (
     <Page title="Product Customizer">
+      {showToast && (
+        <Toast content="Customization saved successfully!" onDismiss={toggleToast} />
+      )}
       <BlockStack gap="500">
         <Layout>
           <Layout.Section>
@@ -141,6 +196,39 @@ export default function Index() {
               </BlockStack>
             </Card>
           </Layout.Section>
+          
+          {customizations.length > 0 && (
+            <Layout.Section>
+              <Card>
+                <BlockStack gap="500">
+                  <Text variant="headingMd" as="h2">Recent Customizations</Text>
+                  
+                  {customizations.map((customization) => (
+                    <Card key={customization.id}>
+                      <BlockStack gap="200">
+                        <Text as="h3" variant="headingSm">
+                          {new Date(customization.createdAt).toLocaleString()}
+                        </Text>
+                        <div style={{
+                          padding: "10px",
+                          border: "1px solid #eee",
+                          borderRadius: "4px",
+                        }}>
+                          <div style={{
+                            fontFamily: customization.fontFamily,
+                            fontSize: `${customization.fontSize}px`,
+                            color: customization.color,
+                          }}>
+                            {customization.text}
+                          </div>
+                        </div>
+                      </BlockStack>
+                    </Card>
+                  ))}
+                </BlockStack>
+              </Card>
+            </Layout.Section>
+          )}
         </Layout>
       </BlockStack>
     </Page>
