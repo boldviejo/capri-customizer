@@ -45,7 +45,7 @@ Supabase's free tier offers:
 4. Deploy your app and wait for the build to complete
 
 ## 4. Configure your Shopify app
-
+a
 1. Go to your [Shopify Partner Dashboard](https://partners.shopify.com/apps)
 2. Update your app's URLs:
    - App URL: Your Vercel deployment URL
