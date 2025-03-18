@@ -1,10 +1,10 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "b60827152e7e4cb3b31ed8f2fa409874"
-application_url = "https://example.com/"
-embedded = true
 name = "Capri Customizer"
 handle = "capri-customizer"
+client_id = "b60827152e7e4cb3b31ed8f2fa409874"
+application_url = "https://capri-customizer.vercel.app"
+embedded = true
 
 [build]
 include_config_on_deploy = true
@@ -25,7 +25,7 @@ api_version = "2025-01"
 scopes = "write_products"
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [ "https://capri-customizer.vercel.app/api/auth" ]
 
 [pos]
 embedded = false
