@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run vercel-build",
+  "buildCommand": "npm install vite@5.0.10 --save && npm run vercel-build",
   "outputDirectory": "build",
   "framework": "remix",
   "installCommand": "npm install --no-save --legacy-peer-deps",
