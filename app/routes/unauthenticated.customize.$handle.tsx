@@ -46,6 +46,13 @@ interface LoaderData {
   shopifyDomain?: string;
 }
 
+interface ActionData {
+  success: boolean;
+  message?: string;
+  bridgeUrl?: string;
+  error?: string;
+}
+
 // Add a helper function to get the Shopify domain on the client side
 const getClientShopifyDomain = () => {
   // This is used when the server's getShopifyDomain function isn't available on the client
@@ -211,7 +218,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const shopifyDomain = getShopifyDomain();
   
   // Format the bridge URL with all parameters
-  const bridgeUrl = `https://${shopifyDomain}/pages/add-to-cart-bridge?variant_id=${variantId}&custom_text=${encodeURIComponent(text)}&font_family=${encodeURIComponent(fontFamily)}&font_size=${encodeURIComponent(fontSize)}&text_color=${encodeURIComponent(color)}`;
+  const bridgeUrl = `https://${shopifyDomain}/pages/add-to-cart-bridge?variant_id=${variantId}&custom_text=${encodeURIComponent(text)}&font_family=${encodeURIComponent(fontFamily)}&font_size=${encodeURIComponent(fontSize)}&text_color=${encodeURIComponent(color)}&position=${encodeURIComponent(position)}`;
   
   // Add pet photo URL if available
   const finalBridgeUrl = uploadedImage 
@@ -344,17 +351,25 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export default function ProductCustomizer() {
   const data = useLoaderData<typeof loader>() as LoaderData;
   const { product, error, shopifyDomain } = data;
-  const actionData = useActionData<typeof action>();
+  const actionData = useActionData<typeof action>() as ActionData;
   const submit = useSubmit();
   
   // State to track if a bridge request is pending
   const [pendingBridgeRequest, setPendingBridgeRequest] = useState<string | null>(null);
   
   // Handle the action response (success/error)
-  const handleActionResponse = (response: any) => {
+  const handleActionResponse = (response: ActionData) => {
     if (response?.bridgeUrl) {
-      // If we have a bridge URL, redirect to it
-      window.location.href = response.bridgeUrl;
+      // Store the bridge URL in case we need to retry
+      setPendingBridgeRequest(response.bridgeUrl);
+      
+      try {
+        // If we have a bridge URL, redirect to it
+        window.location.href = response.bridgeUrl;
+      } catch (error) {
+        console.error("Error redirecting to bridge:", error);
+        alert("There was an error redirecting to the cart. Please try again.");
+      }
     } else if (response?.error) {
       // Handle error
       alert(response.error);
@@ -371,9 +386,14 @@ export default function ProductCustomizer() {
   // Custom function to retry the last bridge if needed
   const retryLastBridge = () => {
     if (pendingBridgeRequest) {
-      // Implementation would depend on your bridge setup
-      console.log("Retrying bridge request:", pendingBridgeRequest);
-      setPendingBridgeRequest(null);
+      try {
+        // Try redirecting again
+        window.location.href = pendingBridgeRequest;
+      } catch (error) {
+        console.error("Error in retry redirect:", error);
+        alert("Failed to redirect to cart. Please try again later.");
+        setPendingBridgeRequest(null);
+      }
     }
   };
   

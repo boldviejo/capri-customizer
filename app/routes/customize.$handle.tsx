@@ -46,6 +46,13 @@ interface LoaderData {
   error: string | null;
 }
 
+interface ActionData {
+  success: boolean;
+  message: string;
+  bridgeUrl?: string;
+  error?: string;
+}
+
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   try {
     // Since authenticate.admin() is just a stub in this app, we'll proceed without checking admin
@@ -181,7 +188,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const shopifyDomain = getShopifyDomain();
     
     // Format the bridge URL with all parameters
-    const bridgeUrl = `https://${shopifyDomain}/pages/add-to-cart-bridge?variant_id=${variantId}&custom_text=${encodeURIComponent(text)}&font_family=${encodeURIComponent(fontFamily)}&font_size=${encodeURIComponent(fontSize)}&text_color=${encodeURIComponent(color)}`;
+    const bridgeUrl = `https://${shopifyDomain}/pages/add-to-cart-bridge?variant_id=${variantId}&custom_text=${encodeURIComponent(text)}&font_family=${encodeURIComponent(fontFamily)}&font_size=${encodeURIComponent(fontSize)}&text_color=${encodeURIComponent(color)}&position=${encodeURIComponent(position)}`;
     
     // Add pet photo URL if available
     const finalBridgeUrl = uploadedImage 
@@ -207,7 +214,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export default function ProductCustomizer() {
   const data = useLoaderData<typeof loader>() as LoaderData;
   const { product, error } = data;
-  const actionData = useActionData<typeof action>();
+  const actionData = useActionData<typeof action>() as ActionData;
   const submit = useSubmit();
   
   // Handle the action response (success/error)
