@@ -16,7 +16,7 @@ Add Cloudinary credentials to your environment variables in `.env`:
 
 ```
 CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_UPLOAD_PRESET=your_upload_preset
+CLOUDINARY_UPLOAD_PRESET=Capri Customizer
 ```
 
 ## Integration Steps
@@ -127,7 +127,7 @@ Place the CloudinaryUploader component in your form, right after the variant sel
 
 <CloudinaryUploader
   cloudName={process.env.CLOUDINARY_CLOUD_NAME}
-  uploadPreset={process.env.CLOUDINARY_UPLOAD_PRESET}
+  uploadPreset="Capri Customizer"
   onImageUploaded={(url) => setPetPhotoUrl(url)}
   onUploadError={(error) => console.error('Upload error:', error)}
 />

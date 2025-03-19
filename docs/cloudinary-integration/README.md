@@ -19,7 +19,7 @@ The uploaded image URL will be passed to the Shopify cart as a line item propert
    - Sign up for a free account at [Cloudinary](https://cloudinary.com/users/register/free)
    - The free tier includes 25GB storage and 25GB bandwidth/month
    - Get your Cloud Name from the dashboard
-   - Create an "Upload Preset" for unsigned uploads (in Settings > Upload)
+   - Use the upload preset name: "Capri Customizer" (or create this preset in Settings > Upload)
 
 2. **Integration Components**
    - Upload Widget JavaScript

@@ -4,7 +4,7 @@ import CloudinaryUploader from './CloudinaryUploader';
 
 // These would come from your environment variables
 const CLOUDINARY_CLOUD_NAME = 'your-cloud-name';
-const CLOUDINARY_UPLOAD_PRESET = 'your-upload-preset';
+const CLOUDINARY_UPLOAD_PRESET = 'Capri Customizer';
 
 export default function PetPortraitCustomizer() {
   // Form state
