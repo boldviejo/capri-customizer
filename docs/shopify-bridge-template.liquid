@@ -1,0 +1,187 @@
+{% comment %}
+  page.add-to-cart-bridge.liquid - Bridge template for adding customized items to cart
+  
+  To use:
+  1. Create a page in your Shopify admin with the handle "add-to-cart-bridge"
+  2. Select this template for the page
+  
+  This template handles both iframe and direct navigation modes.
+{% endcomment %}
+
+{% layout none %}
+
+<!DOCTYPE html>
+<html lang="{{ shop.locale }}">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Adding to cart... - {{ shop.name }}</title>
+  
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, San Francisco, Segoe UI, Roboto, Helvetica Neue, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #fff;
+      color: #333;
+      line-height: 1.5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .container {
+      text-align: center;
+      max-width: 400px;
+      padding: 20px;
+    }
+    .spinner {
+      display: inline-block;
+      width: 50px;
+      height: 50px;
+      border: 3px solid rgba(0, 0, 0, 0.1);
+      border-radius: 50%;
+      border-top-color: #000;
+      animation: spin 1s ease-in-out infinite;
+      margin-bottom: 20px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .hidden {
+      display: none;
+    }
+    .message {
+      margin-top: 20px;
+      font-size: 18px;
+    }
+    .redirect-text {
+      margin-top: 15px;
+      font-size: 14px;
+      color: #666;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="loading" class="spinner"></div>
+    <div class="message">
+      Great choice! This will be a wonderful pet portrait!
+    </div>
+    <div class="redirect-text">
+      You will now be redirected to the cart...
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      // Check if we're in an iframe
+      const isInIframe = window !== window.parent;
+      
+      // Function to get URL parameters
+      function getParam(name) {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get(name);
+      }
+      
+      // Get parameters from URL
+      const variantId = getParam('variant_id');
+      const customText = getParam('custom_text');
+      const fontFamily = getParam('font_family');
+      const fontSize = getParam('font_size');
+      const textColor = getParam('text_color');
+      
+      // Function to send message to parent if in iframe
+      function postMessageToParent(data) {
+        if (isInIframe) {
+          try {
+            window.parent.postMessage(data, '*');
+            console.log('Posted message to parent:', data);
+          } catch (e) {
+            console.error('Error posting message to parent:', e);
+          }
+        }
+      }
+      
+      // Function to add to cart
+      function addToCart() {
+        if (!variantId) {
+          // Just redirect to cart if there's an error
+          if (!isInIframe) {
+            window.location.href = '/cart';
+          }
+          return;
+        }
+        
+        // Build properties object for line item
+        const properties = {};
+        if (customText) properties['Custom Text'] = customText;
+        if (fontFamily) properties['Font'] = fontFamily;
+        if (fontSize) properties['Font Size'] = fontSize;
+        if (textColor) properties['Text Color'] = textColor;
+        
+        // Build the cart data
+        const cartData = {
+          items: [{
+            id: variantId,
+            quantity: 1,
+            properties: properties
+          }]
+        };
+        
+        // Add to cart via AJAX
+        fetch('/cart/add.js', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(cartData)
+        })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          // Get the cart data if needed
+          return fetch('/cart.js')
+            .then(response => response.json())
+            .then(cartData => {
+              // Post message to parent window if in iframe
+              postMessageToParent({ 
+                type: 'add-to-cart-success', 
+                cartCount: cartData.item_count,
+                cartUrl: window.location.origin + '/cart'
+              });
+              
+              // Redirect to cart page after a short delay
+              if (!isInIframe) {
+                setTimeout(() => {
+                  window.location.href = '/cart';
+                }, 1500); // increased delay to allow user to read the message
+              }
+            });
+        })
+        .catch(error => {
+          console.error('Error adding to cart:', error);
+          // Just redirect to cart even if there's an error
+          if (!isInIframe) {
+            window.location.href = '/cart';
+          }
+        });
+      }
+      
+      // Start the process when page loads
+      document.addEventListener('DOMContentLoaded', function() {
+        // Short delay to ensure everything is ready
+        setTimeout(addToCart, 300);
+      });
+    })();
+  </script>
+</body>
+</html> 
