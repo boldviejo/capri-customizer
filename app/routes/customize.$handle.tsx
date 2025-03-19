@@ -15,6 +15,7 @@ import {
 } from "@shopify/polaris";
 
 import { authenticate } from "../shopify.server";
+import ModernCustomizer from "~/components/ModernCustomizer";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: "https://unpkg.com/@shopify/polaris@11.0.0/build/esm/styles.css" },
@@ -126,14 +127,24 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   try {
-    const { admin } = await authenticate.admin(request);
+    const authResult = await authenticate.admin(request);
+    if (!authResult.admin) {
+      return json({
+        success: false,
+        message: "Authentication failed"
+      }, { status: 401 });
+    }
+    
+    const { admin } = authResult;
     const formData = await request.formData();
     
     const text = String(formData.get("text") || "");
     const fontFamily = String(formData.get("fontFamily") || "");
-    const fontSize = Number(formData.get("fontSize") || 16);
+    const fontSize = String(formData.get("fontSize") || "16");
     const color = String(formData.get("color") || "");
     const variantId = String(formData.get("variantId") || "");
+    const position = String(formData.get("position") || "center");
+    const uploadedImage = formData.get("uploadedImage") ? String(formData.get("uploadedImage")) : null;
     
     if (!text || !fontFamily || !fontSize || !color || !variantId) {
       return json({
@@ -159,15 +170,32 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     `);
     
     const cartData = await cartCreateResponse.json();
+    
+    if (cartData.data?.cartCreate?.userErrors?.length > 0) {
+      return json({
+        success: false,
+        message: cartData.data.cartCreate.userErrors[0].message
+      });
+    }
+    
     const cartId = cartData.data.cartCreate.cart.id;
     
     // Create custom attributes for the cart item
     const customAttributes = [
       { key: "Custom Text", value: text },
       { key: "Font", value: fontFamily },
-      { key: "Font Size", value: fontSize.toString() },
-      { key: "Text Color", value: color }
+      { key: "Font Size", value: fontSize },
+      { key: "Text Color", value: color },
+      { key: "Position", value: position }
     ];
+    
+    if (uploadedImage) {
+      customAttributes.push({ key: "Uploaded Image", value: uploadedImage });
+    }
+    
+    const attributesString = customAttributes
+      .map(attr => `{ key: "${attr.key}", value: "${attr.value}" }`)
+      .join(',');
     
     // Add the item to the cart with customization notes
     const cartLineAddResponse = await admin.graphql(`
@@ -179,7 +207,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
               merchandiseId: "${variantId}",
               quantity: 1,
               attributes: [
-                ${customAttributes.map(attr => `{ key: "${attr.key}", value: "${attr.value}" }`).join(',')}
+                ${attributesString}
               ]
             }
           ]
@@ -201,14 +229,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (cartLineData.data?.cartLinesAdd?.userErrors?.length > 0) {
       return json({
         success: false,
-        message: "Failed to add item to cart"
+        message: "Failed to add item to cart: " + cartLineData.data.cartLinesAdd.userErrors[0].message
       });
     }
     
     const checkoutUrl = cartLineData.data.cartLinesAdd.cart.checkoutUrl;
     
-    // Redirect to checkout
-    return redirect(checkoutUrl);
+    // Return the checkout URL for redirect
+    return json({
+      success: true,
+      checkoutUrl,
+      message: "Item added to cart successfully"
+    });
   } catch (error) {
     console.error("Error adding to cart:", error);
     return json({
@@ -223,19 +255,9 @@ export default function ProductCustomizer() {
   const { product, error } = data;
   const submit = useSubmit();
   
-  const [customText, setCustomText] = useState("");
-  const [selectedVariantId, setSelectedVariantId] = useState("");
-  const [fontFamily, setFontFamily] = useState("Arial");
-  const [fontSize, setFontSize] = useState(16);
-  const [textColor, setTextColor] = useState("#000000");
-  
-  // Set the default variant when the product loads
-  useEffect(() => {
-    if (product && product.variants.length > 0) {
-      const availableVariant = product.variants.find((v: ProductVariant) => v.availableForSale);
-      setSelectedVariantId(availableVariant?.id || product.variants[0].id);
-    }
-  }, [product]);
+  const handleSubmit = (formData: FormData) => {
+    submit(formData, { method: "post" });
+  };
   
   if (error) {
     return (
@@ -260,181 +282,10 @@ export default function ProductCustomizer() {
       </Card>
     );
   }
-  
-  const handleSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-    
-    submit(
-      {
-        text: customText,
-        fontFamily,
-        fontSize: fontSize.toString(),
-        color: textColor,
-        variantId: selectedVariantId,
-      },
-      { method: "post" }
-    );
-  };
-  
-  const variantOptions = product.variants.map((variant: ProductVariant) => ({
-    label: variant.title,
-    value: variant.id,
-  }));
-  
-  const fontOptions = [
-    { label: "Arial", value: "Arial" },
-    { label: "Helvetica", value: "Helvetica" },
-    { label: "Times New Roman", value: "Times New Roman" },
-    { label: "Courier New", value: "Courier New" },
-    { label: "Verdana", value: "Verdana" },
-  ];
-  
-  const fontSizeOptions = [
-    { label: "Small (12px)", value: "12" },
-    { label: "Medium (16px)", value: "16" },
-    { label: "Large (20px)", value: "20" },
-    { label: "Extra Large (24px)", value: "24" },
-  ];
-  
-  const colorOptions = [
-    { label: "Black", value: "#000000" },
-    { label: "Red", value: "#FF0000" },
-    { label: "Blue", value: "#0000FF" },
-    { label: "Green", value: "#00FF00" },
-    { label: "Gold", value: "#FFD700" },
-    { label: "Silver", value: "#C0C0C0" },
-  ];
-  
+
   return (
-    <div className="page-container" style={{ maxWidth: '1000px', margin: '0 auto', padding: '20px' }}>
-      <Card>
-        <BlockStack gap="500">
-          <Box padding="400">
-            <BlockStack gap="400">
-              <Text as="h1" variant="headingXl">{product.title}</Text>
-              
-              <InlineStack gap="500" wrap={false} align="start">
-                <div style={{ flex: '0 0 40%' }}>
-                  {product.images && product.images.length > 0 && (
-                    <img 
-                      src={product.images[0].url} 
-                      alt={product.images[0].altText || product.title}
-                      style={{ maxWidth: '100%', borderRadius: '8px' }} 
-                    />
-                  )}
-                </div>
-                
-                <div style={{ flex: '1 1 60%' }}>
-                  <BlockStack gap="400">
-                    <Form method="post" onSubmit={handleSubmit}>
-                      <BlockStack gap="400">
-                        {product.variants.length > 1 && (
-                          <Select
-                            label="Select variant"
-                            options={variantOptions}
-                            onChange={setSelectedVariantId}
-                            value={selectedVariantId}
-                          />
-                        )}
-                        
-                        <Divider />
-                        
-                        <TextField
-                          label="Your Custom Text"
-                          value={customText}
-                          onChange={setCustomText}
-                          autoComplete="off"
-                          placeholder="Enter text for your customization"
-                        />
-                        
-                        <Select
-                          label="Font Style"
-                          options={fontOptions}
-                          onChange={setFontFamily}
-                          value={fontFamily}
-                        />
-                        
-                        <Select
-                          label="Font Size"
-                          options={fontSizeOptions}
-                          onChange={(value) => setFontSize(parseInt(value, 10))}
-                          value={fontSize.toString()}
-                        />
-                        
-                        <Box paddingBlockStart="200" paddingBlockEnd="200">
-                          <Text as="h3" variant="headingMd">Text Color</Text>
-                          <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-                            {colorOptions.map((option) => (
-                              <div 
-                                key={option.value}
-                                onClick={() => setTextColor(option.value)}
-                                style={{
-                                  width: '36px',
-                                  height: '36px',
-                                  backgroundColor: option.value,
-                                  borderRadius: '50%',
-                                  cursor: 'pointer',
-                                  border: textColor === option.value ? '3px solid #000' : '1px solid #ccc',
-                                }}
-                                title={option.label}
-                              />
-                            ))}
-                          </div>
-                        </Box>
-                        
-                        <Box paddingBlockStart="200">
-                          <Text as="h3" variant="headingMd">Preview</Text>
-                          <div 
-                            style={{ 
-                              fontFamily, 
-                              fontSize: `${fontSize}px`, 
-                              color: textColor,
-                              padding: '20px',
-                              border: '1px dashed #ccc',
-                              borderRadius: '8px',
-                              minHeight: '100px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              marginTop: '8px',
-                              backgroundColor: '#f9f9f9'
-                            }}
-                          >
-                            {customText || "Your text will appear here"}
-                          </div>
-                        </Box>
-                        
-                        <Box paddingBlockStart="400">
-                          <Button 
-                            submit
-                            variant="primary" 
-                            disabled={!customText || !selectedVariantId}
-                            size="large"
-                            fullWidth
-                          >
-                            Add Customized Item to Cart
-                          </Button>
-                        </Box>
-                      </BlockStack>
-                    </Form>
-                  </BlockStack>
-                </div>
-              </InlineStack>
-              
-              {product.description && (
-                <BlockStack gap="200">
-                  <Divider />
-                  <Text as="h2" variant="headingLg">Product Description</Text>
-                  <div 
-                    dangerouslySetInnerHTML={{ __html: product.description }}
-                    style={{ lineHeight: '1.6' }}
-                  />
-                </BlockStack>
-              )}
-            </BlockStack>
-          </Box>
-        </BlockStack>
-      </Card>
-    </div>
+    <>
+      <ModernCustomizer product={product} onSubmit={handleSubmit} />
+    </>
   );
 } 

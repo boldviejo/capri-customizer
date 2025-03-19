@@ -6,6 +6,14 @@ import {
   Scripts,
   ScrollRestoration,
 } from "@remix-run/react";
+import { HeroUIProvider } from "@heroui/react";
+import type { LinksFunction } from "@remix-run/node";
+import tailwindStylesUrl from "~/styles/tailwind.css";
+
+export const links: LinksFunction = () => [
+  { rel: "stylesheet", href: "https://cdn.jsdelivr.net/npm/@heroui/react/dist/index.css" },
+  { rel: "stylesheet", href: tailwindStylesUrl },
+];
 
 export default function App() {
   return (
@@ -17,7 +25,9 @@ export default function App() {
         <Links />
       </head>
       <body>
-        <Outlet />
+        <HeroUIProvider>
+          <Outlet />
+        </HeroUIProvider>
         <ScrollRestoration />
         <Scripts />
         <LiveReload />
