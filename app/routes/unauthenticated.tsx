@@ -1,5 +1,7 @@
 import { json, type LinksFunction } from "@remix-run/node";
-import { Outlet } from "@remix-run/react";
+import { Outlet, useLoaderData } from "@remix-run/react";
+import { AppProvider } from "@shopify/polaris";
+import enTranslations from "@shopify/polaris/locales/en.json";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: "https://unpkg.com/@shopify/polaris@11.0.0/build/esm/styles.css" }
@@ -14,9 +16,13 @@ export const loader = async () => {
 };
 
 export default function UnauthenticatedLayout() {
+  const data = useLoaderData<typeof loader>();
+  
   return (
-    <div style={{ padding: "1rem" }}>
-      <Outlet />
-    </div>
+    <AppProvider i18n={enTranslations}>
+      <div style={{ padding: "1rem" }}>
+        <Outlet />
+      </div>
+    </AppProvider>
   );
 } 
