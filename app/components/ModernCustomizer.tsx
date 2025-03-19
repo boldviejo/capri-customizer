@@ -147,7 +147,8 @@ export default function ModernCustomizer({ product, onSubmit }: CustomizerProps)
               
               <div className="space-y-2">
                 <label className="block text-sm font-medium">Text Position</label>
-                <Select 
+                <select 
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
                   value={textPosition}
                   onChange={(e) => setTextPosition(e.target.value)}
                 >
@@ -156,12 +157,13 @@ export default function ModernCustomizer({ product, onSubmit }: CustomizerProps)
                       {option.label}
                     </option>
                   ))}
-                </Select>
+                </select>
               </div>
             
               <div className="space-y-2">
                 <label className="block text-sm font-medium">Font Family</label>
-                <Select 
+                <select 
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
                   value={fontFamily}
                   onChange={(e) => setFontFamily(e.target.value)}
                 >
@@ -170,7 +172,7 @@ export default function ModernCustomizer({ product, onSubmit }: CustomizerProps)
                       {option.label}
                     </option>
                   ))}
-                </Select>
+                </select>
               </div>
               
               <div className="space-y-2">
@@ -198,7 +200,8 @@ export default function ModernCustomizer({ product, onSubmit }: CustomizerProps)
             
               <div className="space-y-2">
                 <label className="block text-sm font-medium">Product Variant</label>
-                <Select 
+                <select 
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
                   value={selectedVariantId} 
                   onChange={(e) => setSelectedVariantId(e.target.value)}
                 >
@@ -211,7 +214,7 @@ export default function ModernCustomizer({ product, onSubmit }: CustomizerProps)
                       {variant.title} - ${variant.price} {!variant.availableForSale && "(Out of Stock)"}
                     </option>
                   ))}
-                </Select>
+                </select>
               </div>
             </div>
             
