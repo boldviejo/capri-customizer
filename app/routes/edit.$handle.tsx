@@ -178,9 +178,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       };
 
       // Validate that the variantId exists in the product
-      if (initialValues.variantId && !product.variants.some(v => v.id === initialValues.variantId)) {
+      if (initialValues.variantId && !product.variants.some((v: ProductVariant) => v.id === initialValues.variantId)) {
         console.warn("Variant ID not found in product variants:", initialValues.variantId);
-        console.log("Available variants:", product.variants.map(v => v.id));
+        console.log("Available variants:", product.variants.map((v: ProductVariant) => v.id));
         
         // Check if the variantId needs to be transformed to a Shopify gid format
         const variantsById = product.variants.reduce((acc: Record<string, string>, v: ProductVariant) => {
@@ -385,23 +385,12 @@ export default function EditCustomizer() {
     if (actionData?.bridgeUrl) {
       console.log("Preparing to redirect to bridge URL:", actionData.bridgeUrl);
       
-      // Store the bridge URL in state and session storage for retries
+      // Store the bridge URL in state for the confirmation step
       setPendingBridgeRequest(actionData.bridgeUrl);
+      
+      // Do not automatically redirect - let the user confirm first
       if (typeof window !== 'undefined') {
-        sessionStorage.setItem('pendingBridgeRequest', actionData.bridgeUrl);
-        sessionStorage.setItem('retryCount', '0');
-        
-        // Set redirect attempt counter
-        const redirectAttempt = parseInt(sessionStorage.getItem('redirectAttempt') || '0', 10);
-        sessionStorage.setItem('redirectAttempt', (redirectAttempt + 1).toString());
-        
-        // Log the redirect action
-        console.log("Redirecting to bridge URL now...");
-        
-        // Add a small delay to ensure logs are shown before redirect
-        setTimeout(() => {
-          window.location.href = actionData.bridgeUrl as string;
-        }, 100);
+        sessionStorage.removeItem('redirectAttempt'); // Reset counter
       }
     } else if (actionData?.error) {
       console.error("Action error:", actionData.error);
@@ -410,28 +399,20 @@ export default function EditCustomizer() {
   
   // Check for stored bridge requests on initial load
   useEffect(() => {
+    // Clear any redirect attempt counter on page load to break potential loops
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('redirectAttempt');
+      console.log("Cleared redirect attempt counter on page load");
+    }
+    
     const checkForStoredBridgeRequest = () => {
       if (typeof window !== 'undefined') {
         const storedBridgeRequest = sessionStorage.getItem('pendingBridgeRequest');
-        const storedRetryCount = parseInt(sessionStorage.getItem('retryCount') || '0', 10);
-        const redirectAttempt = parseInt(sessionStorage.getItem('redirectAttempt') || '0', 10);
-        
-        // Check redirect attempt counter to prevent loops
-        if (redirectAttempt > 2) {
-          console.log("Too many redirect attempts, clearing stored request");
-          sessionStorage.removeItem('pendingBridgeRequest');
-          sessionStorage.removeItem('retryCount');
-          sessionStorage.removeItem('redirectAttempt');
-          return;
-        }
         
         if (storedBridgeRequest) {
           console.log("Found stored bridge request:", storedBridgeRequest);
-          console.log("Current retry count:", storedRetryCount);
-          console.log("Current redirect attempt:", redirectAttempt);
           
           setPendingBridgeRequest(storedBridgeRequest);
-          setRetryCount(storedRetryCount);
           
           // DISABLE AUTOMATIC REDIRECT ON PAGE LOAD
           // We'll let the user initiate the redirect after reviewing their customization
@@ -446,14 +427,8 @@ export default function EditCustomizer() {
       }
     };
     
-    // Only check for stored requests if not already checking for redirect loops
-    const redirectAttempt = typeof window !== 'undefined' ? 
-      parseInt(sessionStorage.getItem('redirectAttempt') || '0', 10) : 0;
-      
-    if (redirectAttempt <= 2) {
-      checkForStoredBridgeRequest();
-    }
-  }, [maxRetries]);
+    checkForStoredBridgeRequest();
+  }, []);
   
   const retryLastBridge = () => {
     if (pendingBridgeRequest) {
@@ -504,10 +479,10 @@ export default function EditCustomizer() {
   
   const confirmUpdate = () => {
     if (pendingBridgeRequest) {
-      // Increment redirect attempt counter
+      // Set redirect attempt counter to 1 for this redirect
       if (typeof window !== 'undefined') {
-        const redirectAttempt = parseInt(sessionStorage.getItem('redirectAttempt') || '0', 10);
-        sessionStorage.setItem('redirectAttempt', (redirectAttempt + 1).toString());
+        sessionStorage.removeItem('redirectAttempt'); // Clear first
+        sessionStorage.setItem('redirectAttempt', '1'); // Set to 1
       }
       
       console.log("User confirmed, redirecting to bridge URL:", pendingBridgeRequest);

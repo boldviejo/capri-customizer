@@ -220,29 +220,17 @@
       operationInProgress = true;
       
       try {
+        // Reset redirect attempt counter at the start of the process
+        // This ensures we break any potential loops between different pages
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.removeItem('redirectAttempt');
+        }
+        
         // Update message to show what's happening
         document.getElementById('message').textContent = 'Preparing to update your cart...';
         
         // Add a short delay before processing to allow the user to see what's happening
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Check if we're in a redirect loop
-        if (typeof sessionStorage !== 'undefined') {
-          const redirectAttempt = parseInt(sessionStorage.getItem('redirectAttempt') || '0', 10);
-          console.log('Current redirect attempt count:', redirectAttempt);
-          
-          if (redirectAttempt > 2) {
-            // We're in a redirect loop, show error and clear data
-            clearRedirectData();
-            showError('Redirect loop detected while updating cart. Please try again or return to cart.', {
-              redirectAttempts: redirectAttempt 
-            });
-            return;
-          }
-          
-          // Increment the redirect attempt counter
-          sessionStorage.setItem('redirectAttempt', (redirectAttempt + 1).toString());
-        }
         
         // Get and validate parameters
         params = getParams();

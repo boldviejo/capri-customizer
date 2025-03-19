@@ -176,9 +176,9 @@
       
       // Add event listener to the confirmation button
       document.getElementById('confirm-redirect').addEventListener('click', function() {
-        // Increment the redirect attempt counter
-        const redirectAttempt = parseInt(sessionStorage.getItem('redirectAttempt') || '0', 10);
-        sessionStorage.setItem('redirectAttempt', (redirectAttempt + 1).toString());
+        // Reset any existing counter first, then set to 1 for this attempt
+        sessionStorage.removeItem('redirectAttempt');
+        sessionStorage.setItem('redirectAttempt', '1');
         
         // Redirect to the target URL
         window.location.href = targetUrl;
@@ -187,20 +187,9 @@
     
     (function() {
       try {
-        // Check for redirect loop
-        const redirectAttempt = parseInt(sessionStorage.getItem('redirectAttempt') || '0', 10);
-        console.log('Current redirect attempt count:', redirectAttempt);
-        
-        if (redirectAttempt > 2) {
-          // We're in a redirect loop, show error and clear data
-          clearRedirectLoopData();
-          showError('Redirect loop detected. Please try again or return to cart.', { 
-            redirectAttempts: redirectAttempt 
-          });
-          return;
-        }
-        
-        // Don't increment the counter here, only when user confirms
+        // Reset redirect counter when this bridge page loads
+        // This is critical to break the loop - we only count redirects after leaving this page
+        sessionStorage.removeItem('redirectAttempt');
         
         // Get parameters from URL and store them globally
         allParams = {
