@@ -195,6 +195,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const fontSize = Number(formData.get("fontSize") || 16);
   const color = String(formData.get("color") || "");
   const variantId = String(formData.get("variantId") || "");
+  const returnUrl = String(formData.get("returnUrl") || ""); // Optional return URL
   
   if (!text || !fontFamily || !fontSize || !color || !variantId) {
     return json({
@@ -207,8 +208,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     // Get the Shopify domain
     const shopifyDomain = getShopifyDomain();
     
-    // Extract the numeric variant ID (removing the gid:// prefix)
-    const cleanVariantId = variantId.replace("gid://shopify/ProductVariant/", "");
+    // Extract the numeric variant ID (removing the gid:// prefix if present)
+    const cleanVariantId = variantId.includes('gid://shopify/ProductVariant/') 
+      ? variantId.replace("gid://shopify/ProductVariant/", "") 
+      : variantId;
+    
+    // Get the app origin for potential return URL
+    const appOrigin = request.headers.get('origin') || 
+      request.headers.get('referer')?.split('/').slice(0, 3).join('/') || 
+      '';
     
     // Return the data to be passed to the bridge page
     return json({
@@ -219,7 +227,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         fontFamily,
         fontSize: fontSize.toString(),
         color,
-        shopifyDomain
+        shopifyDomain,
+        // Send the return URL if provided, otherwise use the current app URL
+        returnUrl: returnUrl || appOrigin
       },
       message: "Ready to add to cart"
     });
@@ -251,6 +261,9 @@ export default function ProductCustomizer() {
   const [checkoutUrl, setCheckoutUrl] = useState("");
   const [addedToCart, setAddedToCart] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  
+  // Add returnUrl state
+  const [returnToCustomizer, setReturnToCustomizer] = useState(true);
   
   // Process action data when it changes
   useEffect(() => {
@@ -304,10 +317,70 @@ export default function ProductCustomizer() {
     );
   }
   
+  // Handle form submission result with improved error handling and retries
+  const handleActionResponse = (response: any) => {
+    if (response?.success && response.customizationData) {
+      // We have the customization data - prepare to redirect to bridge
+      const data = response.customizationData;
+      const domain = data.shopifyDomain || getClientShopifyDomain();
+      
+      try {
+        // Encode all parameters for URL safety
+        const returnUrl = returnToCustomizer 
+          ? window.location.href 
+          : (data.returnUrl || '');
+        
+        const bridgeUrl = `https://${domain}/pages/add-to-cart-bridge?` + 
+          `variant_id=${encodeURIComponent(data.variantId)}&` +
+          `custom_text=${encodeURIComponent(data.text || '')}&` +
+          `font_family=${encodeURIComponent(data.fontFamily || '')}&` +
+          `font_size=${encodeURIComponent(data.fontSize || '')}&` +
+          `text_color=${encodeURIComponent(data.color || '')}&` +
+          `return_url=${encodeURIComponent(returnUrl)}`;
+        
+        console.log("Redirecting to bridge page:", bridgeUrl);
+        
+        // Store the last successful bridge URL in localStorage for potential retries
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('lastBridgeUrl', bridgeUrl);
+          localStorage.setItem('lastBridgeTime', Date.now().toString());
+        }
+        
+        // Redirect to the bridge page
+        window.location.href = bridgeUrl;
+      } catch (error) {
+        console.error("Error constructing bridge URL:", error);
+        setErrorMessage("An error occurred while processing your request. Please try again.");
+      }
+    } else if (response?.message) {
+      setErrorMessage(response.message);
+    }
+  };
+  
+  // Add a retry function
+  const retryLastBridge = () => {
+    const lastBridgeUrl = localStorage.getItem('lastBridgeUrl');
+    if (lastBridgeUrl) {
+      window.location.href = lastBridgeUrl;
+    } else {
+      setErrorMessage("No previous add to cart attempt found. Please try submitting the form again.");
+    }
+  };
+  
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setAddedToCart(false);
     setErrorMessage("");
+    
+    if (!customText) {
+      setErrorMessage("Please enter your custom text");
+      return;
+    }
+    
+    if (!selectedVariantId) {
+      setErrorMessage("Please select a product variant");
+      return;
+    }
     
     const formData = new FormData();
     formData.append("text", customText);
@@ -315,32 +388,13 @@ export default function ProductCustomizer() {
     formData.append("fontSize", fontSize.toString());
     formData.append("color", textColor);
     formData.append("variantId", selectedVariantId);
+    formData.append("returnUrl", window.location.href);
     
-    const response = await submit(formData, { method: "post", replace: true });
-  };
-  
-  // Handle form submission result
-  const handleActionResponse = (response: any) => {
-    if (response?.success && response.customizationData) {
-      // We have the customization data - redirect to our bridge page
-      const data = response.customizationData;
-      const domain = data.shopifyDomain || getClientShopifyDomain();
-      
-      // Encode all parameters for URL safety
-      const bridgeUrl = `https://${domain}/pages/add-to-cart-bridge?` + 
-        `variant_id=${encodeURIComponent(data.variantId)}&` +
-        `custom_text=${encodeURIComponent(data.text)}&` +
-        `font_family=${encodeURIComponent(data.fontFamily)}&` +
-        `font_size=${encodeURIComponent(data.fontSize)}&` +
-        `text_color=${encodeURIComponent(data.color)}`;
-      
-      console.log("Redirecting to bridge page:", bridgeUrl);
-      
-      // Redirect to the bridge page
-      window.location.href = bridgeUrl;
-      
-    } else if (response?.message) {
-      setErrorMessage(response.message);
+    try {
+      const response = await submit(formData, { method: "post", replace: true });
+    } catch (error) {
+      console.error("Error submitting form:", error);
+      setErrorMessage("An error occurred while submitting the form. Please try again.");
     }
   };
   
@@ -500,6 +554,18 @@ export default function ProductCustomizer() {
                             {customText || "Your text will appear here"}
                           </div>
                         </Box>
+                        
+                        <div style={{ marginTop: '20px' }}>
+                          <label style={{ display: 'flex', alignItems: 'center' }}>
+                            <input
+                              type="checkbox"
+                              checked={returnToCustomizer}
+                              onChange={() => setReturnToCustomizer(!returnToCustomizer)}
+                              style={{ marginRight: '10px' }}
+                            />
+                            Return to customizer after adding to cart
+                          </label>
+                        </div>
                         
                         <Box paddingBlockStart="400">
                           <Button 
