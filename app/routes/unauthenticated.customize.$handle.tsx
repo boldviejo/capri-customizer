@@ -214,135 +214,50 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   }
   
-  // Get the Shopify domain
-  const shopifyDomain = getShopifyDomain();
-  
-  // Format the bridge URL with all parameters
-  const bridgeUrl = `https://${shopifyDomain}/pages/add-to-cart-bridge?variant_id=${variantId}&custom_text=${encodeURIComponent(text)}&font_family=${encodeURIComponent(fontFamily)}&font_size=${encodeURIComponent(fontSize)}&text_color=${encodeURIComponent(color)}&position=${encodeURIComponent(position)}`;
-  
-  // Add pet photo URL if available
-  const finalBridgeUrl = uploadedImage 
-    ? `${bridgeUrl}&pet_photo_url=${encodeURIComponent(uploadedImage)}` 
-    : bridgeUrl;
-  
-  // Check if Storefront API token is available
-  if (!process.env.SHOPIFY_STOREFRONT_API_TOKEN) {
-    console.warn("SHOPIFY_STOREFRONT_API_TOKEN is not set, returning bridge URL");
-    
-    // Return a bridge URL for testing
-    return json({
-      success: true,
-      bridgeUrl: finalBridgeUrl,
-      message: "Redirecting to add-to-cart bridge"
-    });
-  }
-  
   try {
-    // Even with the Storefront API token, we'll use the bridge URL approach
-    // as it works better with customizations
+    // Get the Shopify domain - this is critical for forming the correct URL
+    const shopifyDomain = getShopifyDomain();
+    
+    if (!shopifyDomain) {
+      throw new Error("Could not determine Shopify domain");
+    }
+    
+    // Make sure the variant ID is properly formatted for Shopify
+    // Sometimes IDs need to be transformed from the GraphQL format
+    let finalVariantId = variantId;
+    if (variantId.startsWith('gid://shopify/ProductVariant/')) {
+      // Extract just the ID part from the GraphQL ID
+      finalVariantId = variantId.replace('gid://shopify/ProductVariant/', '');
+    }
+    
+    // Format the bridge URL with all parameters - be explicit with the bridge page path
+    const bridgeUrl = new URL(`https://${shopifyDomain}/pages/add-to-cart-bridge`);
+    
+    // Add parameters using URLSearchParams for proper encoding
+    bridgeUrl.searchParams.append('variant_id', finalVariantId);
+    bridgeUrl.searchParams.append('custom_text', text);
+    bridgeUrl.searchParams.append('font_family', fontFamily);
+    bridgeUrl.searchParams.append('font_size', fontSize);
+    bridgeUrl.searchParams.append('text_color', color);
+    bridgeUrl.searchParams.append('position', position);
+    
+    // Add pet photo URL if available
+    if (uploadedImage) {
+      bridgeUrl.searchParams.append('pet_photo_url', uploadedImage);
+    }
+    
+    console.log("Generated bridge URL:", bridgeUrl.toString());
+    
+    // Return bridge URL for client to handle
     return json({
       success: true,
-      bridgeUrl: finalBridgeUrl,
+      bridgeUrl: bridgeUrl.toString(),
       message: "Redirecting to add-to-cart bridge"
     });
-    
-    /* 
-    // Commenting out the direct cart API usage in favor of the bridge
-    // Create a cart
-    const cartCreateQuery = `
-      mutation cartCreate {
-        cartCreate {
-          cart {
-            id
-            checkoutUrl
-          }
-          userErrors {
-            field
-            message
-          }
-        }
-      }
-    `;
-    
-    const cartCreateResult = await queryStorefrontApi(cartCreateQuery);
-    const cartData = cartCreateResult.data.cartCreate;
-    
-    if (cartData.userErrors && cartData.userErrors.length > 0) {
-      console.error("Error creating cart:", cartData.userErrors);
-      return json({
-        error: "Error creating cart: " + cartData.userErrors[0].message,
-        success: false
-      });
-    }
-    
-    const cartId = cartData.cart.id;
-    
-    // Add the customized item to the cart
-    const customAttributes = [
-      { key: "Custom Text", value: text },
-      { key: "Font", value: fontFamily },
-      { key: "Font Size", value: fontSize },
-      { key: "Text Color", value: color },
-      { key: "Position", value: position }
-    ];
-    
-    if (uploadedImage) {
-      customAttributes.push({ key: "Uploaded Image", value: uploadedImage });
-    }
-    
-    const attributesString = customAttributes
-      .map(attr => `{key: "${attr.key}", value: "${attr.value}"}`)
-      .join(",");
-    
-    const cartAddQuery = `
-      mutation cartLinesAdd($cartId: ID!, $lines: [CartLineInput!]!) {
-        cartLinesAdd(cartId: $cartId, lines: $lines) {
-          cart {
-            id
-            checkoutUrl
-          }
-          userErrors {
-            field
-            message
-          }
-        }
-      }
-    `;
-    
-    const cartAddVariables = {
-      cartId,
-      lines: [
-        {
-          merchandiseId: variantId,
-          quantity: 1,
-          attributes: customAttributes
-        }
-      ]
-    };
-    
-    const cartAddResult = await queryStorefrontApi(cartAddQuery, cartAddVariables);
-    const cartAddData = cartAddResult.data.cartLinesAdd;
-    
-    if (cartAddData.userErrors && cartAddData.userErrors.length > 0) {
-      console.error("Error adding item to cart:", cartAddData.userErrors);
-      return json({
-        error: "Error adding item to cart: " + cartAddData.userErrors[0].message,
-        success: false
-      });
-    }
-    
-    // Return the checkout URL
-    return json({
-      success: true,
-      checkoutUrl: cartAddData.cart.checkoutUrl,
-      message: "Item added to cart successfully"
-    });
-    */
-    
   } catch (error) {
-    console.error("Error in checkout process:", error);
+    console.error("Error creating bridge URL:", error);
     return json({
-      error: "An error occurred during checkout",
+      error: error instanceof Error ? error.message : "An error occurred during checkout",
       success: false
     });
   }
@@ -354,25 +269,39 @@ export default function ProductCustomizer() {
   const actionData = useActionData<typeof action>() as ActionData;
   const submit = useSubmit();
   
-  // State to track if a bridge request is pending
+  // State to track if a bridge request is pending and retry count
   const [pendingBridgeRequest, setPendingBridgeRequest] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 3;
+  
+  // Store shopify domain in session storage for fallback purposes
+  useEffect(() => {
+    if (shopifyDomain && typeof window !== 'undefined') {
+      sessionStorage.setItem('shopifyDomain', shopifyDomain);
+    }
+  }, [shopifyDomain]);
   
   // Handle the action response (success/error)
   const handleActionResponse = (response: ActionData) => {
     if (response?.bridgeUrl) {
-      // Store the bridge URL in case we need to retry
+      // Store the bridge URL in state and session storage for retries
       setPendingBridgeRequest(response.bridgeUrl);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('pendingBridgeRequest', response.bridgeUrl);
+      }
       
       try {
-        // If we have a bridge URL, redirect to it
-        window.location.href = response.bridgeUrl;
+        console.log("Redirecting to bridge URL:", response.bridgeUrl);
+        // Use window.location.replace instead of href for a cleaner redirect experience
+        window.location.replace(response.bridgeUrl);
       } catch (error) {
         console.error("Error redirecting to bridge:", error);
         alert("There was an error redirecting to the cart. Please try again.");
       }
     } else if (response?.error) {
-      // Handle error
-      alert(response.error);
+      // Handle error with more meaningful messages
+      console.error("Add to cart error:", response.error);
+      alert(`Error: ${response.error}. Please try again.`);
     }
   };
   
@@ -383,22 +312,72 @@ export default function ProductCustomizer() {
     }
   }, [actionData]);
   
+  // Look for a stored bridge URL on initial load to handle post-redirect recovery
+  useEffect(() => {
+    const checkForStoredBridgeRequest = () => {
+      if (typeof window !== 'undefined') {
+        const storedRequest = sessionStorage.getItem('pendingBridgeRequest');
+        if (storedRequest) {
+          setPendingBridgeRequest(storedRequest);
+          
+          // Only auto-retry if we know we're returning from a bridge
+          const isReturningFromBridge = document.referrer.includes('/pages/add-to-cart-bridge');
+          if (isReturningFromBridge) {
+            // Auto-retry once if we're coming back from a failed bridge redirect
+            retryLastBridge();
+          }
+        }
+      }
+    };
+    
+    // Check on initial load
+    checkForStoredBridgeRequest();
+  }, []);
+  
   // Custom function to retry the last bridge if needed
   const retryLastBridge = () => {
-    if (pendingBridgeRequest) {
+    if (pendingBridgeRequest && retryCount < maxRetries) {
+      setRetryCount(prevCount => prevCount + 1);
+      
       try {
-        // Try redirecting again
-        window.location.href = pendingBridgeRequest;
+        console.log(`Retry attempt ${retryCount + 1} for bridge URL:`, pendingBridgeRequest);
+        // Use window.location.replace instead of href for a cleaner redirect
+        window.location.replace(pendingBridgeRequest);
+        
+        // Optionally add a delay if needed
+        // setTimeout(() => window.location.replace(pendingBridgeRequest), 500);
       } catch (error) {
         console.error("Error in retry redirect:", error);
         alert("Failed to redirect to cart. Please try again later.");
-        setPendingBridgeRequest(null);
+        
+        if (typeof window !== 'undefined') {
+          // Clear the stored request after max retries
+          if (retryCount >= maxRetries - 1) {
+            sessionStorage.removeItem('pendingBridgeRequest');
+            setPendingBridgeRequest(null);
+            setRetryCount(0);
+          }
+        }
       }
+    } else if (retryCount >= maxRetries) {
+      // Clear stored data after max retries
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('pendingBridgeRequest');
+      }
+      setPendingBridgeRequest(null);
+      setRetryCount(0);
+      alert("Unable to add item to cart after multiple attempts. Please try again later.");
     }
   };
   
   // Handle form submission
   const handleSubmit = async (formData: FormData) => {
+    // Reset retry count for new submissions
+    setRetryCount(0);
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('pendingBridgeRequest');
+    }
+    
     submit(formData, { method: "post" });
   };
   

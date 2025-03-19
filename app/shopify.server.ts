@@ -8,11 +8,30 @@ export const getStorefrontApiToken = () => {
 };
 
 /**
- * Get the Shopify domain from environment variables
+ * Gets the Shopify domain from environment variables
+ * or falls back to a hardcoded default for development.
+ * 
+ * This function is used to form URLs for redirects and API requests
+ * across the application.
  */
-export const getShopifyDomain = () => {
-  return process.env.SHOPIFY_DOMAIN || "capri-dev-store.myshopify.com";
-};
+export function getShopifyDomain(): string {
+  // Try to get from environment variables
+  const envDomain = process.env.SHOPIFY_DOMAIN;
+  
+  if (envDomain) {
+    // Ensure the domain doesn't have a protocol prefix
+    if (envDomain.startsWith('http://') || envDomain.startsWith('https://')) {
+      const url = new URL(envDomain);
+      return url.hostname;
+    }
+    return envDomain;
+  }
+  
+  // Default fallback - should be configured in environment variables in production
+  // Typically this has .myshopify.com format if it's a non-custom domain
+  console.warn('SHOPIFY_DOMAIN environment variable not set, using fallback');
+  return 'capri-dev-store.myshopify.com';
+}
 
 /**
  * Create headers for Storefront API requests
