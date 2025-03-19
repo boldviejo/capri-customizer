@@ -182,10 +182,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
   
   try {
+    let existingCartId = cartId;
+    
+    // If there's no cartId provided, we'll need to create a new cart
+    // Shopify carts are tied to browser cookies, so we can't easily fetch an existing cart
+    // without the cart ID
+    
     let query = '';
     let variables: any = {};
     
-    if (cartId) {
+    if (existingCartId) {
       // If we have a cart ID, add to existing cart
       query = `
         mutation addToCart($cartId: ID!, $variantId: ID!, $customText: String!, $fontFamily: String!, $fontSize: String!, $color: String!) {
@@ -217,7 +223,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
       `;
       variables = {
-        cartId,
+        cartId: existingCartId,
         variantId,
         customText: text,
         fontFamily,
@@ -268,7 +274,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const responseData = await queryStorefrontApi(query, variables);
     
     // Determine which response structure we get based on the query used
-    const operationName = cartId ? 'cartLinesAdd' : 'cartCreate';
+    const operationName = existingCartId ? 'cartLinesAdd' : 'cartCreate';
     const userErrors = responseData.data?.[operationName]?.userErrors || [];
     
     if (userErrors.length > 0) {
@@ -287,7 +293,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       });
     }
     
-    // Return cart details instead of redirecting
+    // After adding the item, redirect to the cart/checkout page
+    if (cartDetails.checkoutUrl) {
+      return redirect(cartDetails.checkoutUrl);
+    }
+    
+    // Return cart details if not redirecting
     return json({
       success: true,
       message: "Item added to cart successfully!",
