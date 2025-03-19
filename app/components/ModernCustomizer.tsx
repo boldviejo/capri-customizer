@@ -36,7 +36,7 @@ export default function ModernCustomizer({
   initialValues = {}, 
   submitButtonText = "Add to Cart" 
 }: CustomizerProps) {
-  console.log("ModernCustomizer initialValues:", initialValues);
+  console.log("ModernCustomizer received initialValues:", initialValues);
 
   // Initialize state with values or defaults
   const [customText, setCustomText] = useState(initialValues.customText || "");
@@ -49,7 +49,7 @@ export default function ModernCustomizer({
   
   // Log the initial state for debugging
   useEffect(() => {
-    console.log("ModernCustomizer initial state:", {
+    console.log("ModernCustomizer initialized with state:", {
       customText,
       selectedVariantId,
       fontFamily,
@@ -65,12 +65,23 @@ export default function ModernCustomizer({
     // Only set default variant if one wasn't provided in initialValues
     if (!initialValues.selectedVariantId && product && product.variants.length > 0) {
       const availableVariant = product.variants.find(v => v.availableForSale);
-      setSelectedVariantId(availableVariant?.id || product.variants[0].id);
+      if (availableVariant) {
+        console.log("Setting default available variant:", availableVariant.id);
+        setSelectedVariantId(availableVariant.id);
+      } else {
+        console.log("No available variant found, using first variant:", product.variants[0].id);
+        setSelectedVariantId(product.variants[0].id);
+      }
+    } else if (initialValues.selectedVariantId) {
+      console.log("Using provided variant ID:", initialValues.selectedVariantId);
     }
     
     // Only set default image if one wasn't provided in initialValues
     if (!initialValues.imagePreview && product && product.images.length > 0) {
+      console.log("Setting default product image preview:", product.images[0].url);
       setImagePreview(product.images[0].url);
+    } else if (initialValues.imagePreview) {
+      console.log("Using provided image preview URL:", initialValues.imagePreview);
     }
   }, [product, initialValues]);
 
@@ -85,8 +96,10 @@ export default function ModernCustomizer({
     formData.append("fontSize", fontSize ? fontSize.toString() : "16");
     formData.append("color", textColor || "#000000");
     formData.append("variantId", selectedVariantId);
+    
+    // Include both position and textPosition for consistency
     formData.append("position", textPosition || "center");
-    formData.append("textPosition", textPosition || "center"); // Include both formats
+    formData.append("textPosition", textPosition || "center");
     
     // Handle image preview
     if (imagePreview && !product.images.some(img => img.url === imagePreview)) {
@@ -101,6 +114,7 @@ export default function ModernCustomizer({
       color: textColor,
       variantId: selectedVariantId,
       position: textPosition,
+      textPosition: textPosition,
       hasUploadedImage: !!imagePreview && !product.images.some(img => img.url === imagePreview)
     });
     
@@ -141,7 +155,7 @@ export default function ModernCustomizer({
       bottom: { ...baseStyle, bottom: "10%", left: "10%" },
     };
 
-    return positionStyles[textPosition];
+    return positionStyles[textPosition] || positionStyles["center"];
   };
 
   return (

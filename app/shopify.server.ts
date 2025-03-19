@@ -4,7 +4,11 @@
  * Get the Storefront API token from environment variables
  */
 export const getStorefrontApiToken = () => {
-  return process.env.SHOPIFY_STOREFRONT_API_TOKEN;
+  const token = process.env.SHOPIFY_STOREFRONT_API_TOKEN;
+  if (!token) {
+    console.warn('⚠️ SHOPIFY_STOREFRONT_API_TOKEN is not set! API calls will fail.');
+  }
+  return token;
 };
 
 /**
@@ -31,8 +35,15 @@ export function getShopifyDomain(): string {
       return url.hostname;
     } catch (error) {
       console.error(`⚠️ Error parsing Shopify domain URL: ${envDomain}`, error);
-      return envDomain;
+      // Fall back to the raw value but log the error
+      return envDomain.replace(/^https?:\/\//, '');
     }
+  }
+  
+  // Check if domain already has .myshopify.com suffix
+  if (!envDomain.includes('.myshopify.com') && !envDomain.includes('.')) {
+    console.log(`Adding .myshopify.com suffix to domain: ${envDomain}`);
+    return `${envDomain}.myshopify.com`;
   }
   
   return envDomain;

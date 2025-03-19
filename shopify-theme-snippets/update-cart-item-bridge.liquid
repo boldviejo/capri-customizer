@@ -1,11 +1,12 @@
 {% comment %}
-  update-cart-item-bridge.liquid - Bridge template for updating customized items in cart
+  update-cart-item-bridge.liquid - Bridge page for updating customized items in the cart
   
   To use:
-  1. Create a page in your Shopify admin with the handle "update-cart-item-bridge"
-  2. Select this template for the page
+  1. Create a page in your Shopify admin with handle "update-cart-item-bridge"
+  2. Set this file as the template
   
-  This template handles updating an existing item in the cart with new customization properties.
+  This page handles updating existing cart items with new customization details.
+  It receives parameters from the edit form and updates the cart using the Shopify Cart API.
 {% endcomment %}
 
 {% layout none %}
@@ -16,7 +17,7 @@
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Updating cart item... - {{ shop.name }}</title>
+  <title>Updating Your Cart... - {{ shop.name }}</title>
   
   <style>
     body {
@@ -34,7 +35,7 @@
     }
     .container {
       text-align: center;
-      max-width: 400px;
+      max-width: 500px;
       padding: 20px;
     }
     .spinner {
@@ -50,193 +51,246 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
-    .hidden {
-      display: none;
-    }
     .message {
       margin-top: 20px;
       font-size: 18px;
     }
-    .redirect-text {
-      margin-top: 15px;
-      font-size: 14px;
-      color: #666;
-      font-style: italic;
-    }
-    .error-message {
+    .error {
       color: #d82c0d;
       margin-top: 20px;
-      padding: 10px;
-      border: 1px solid #fadce0;
-      background-color: #fef2f2;
+      background: #fbeae5;
+      padding: 15px;
       border-radius: 4px;
+      display: none;
     }
-    .success-message {
-      color: #108043;
+    .success {
+      color: #008060;
       margin-top: 20px;
-      padding: 10px;
-      border: 1px solid #cfe3d4;
-      background-color: #f3f9f4;
+      background: #e3f1df;
+      padding: 15px;
       border-radius: 4px;
+      display: none;
+    }
+    .debug {
+      text-align: left;
+      background: #f9fafb;
+      padding: 15px;
+      border-radius: 4px;
+      border: 1px solid #e0e0e0;
+      font-family: monospace;
+      font-size: 12px;
+      overflow: auto;
+      max-height: 200px;
+      margin-top: 20px;
+      display: none;
+    }
+    .actions {
+      margin-top: 20px;
+      display: none;
+    }
+    .button {
+      display: inline-block;
+      border: 1px solid #bababa;
+      color: #323232;
+      padding: 10px 20px;
+      background: #fff;
+      border-radius: 4px;
+      text-decoration: none;
+      margin: 0 5px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .button-primary {
+      background: #008060;
+      color: #fff;
+      border-color: #008060;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <div id="loading" class="spinner"></div>
-    <div id="message" class="message">
-      Updating your customization...
+    <div class="spinner" id="spinner"></div>
+    <div class="message" id="message">
+      Updating your customized item...
     </div>
-    <div id="redirectText" class="redirect-text">
-      You will be redirected to the cart once complete...
+    <div id="success" class="success"></div>
+    <div id="error" class="error"></div>
+    <div id="debug" class="debug"></div>
+    <div id="actions" class="actions">
+      <a href="/cart" class="button button-primary">View Cart</a>
+      <a href="/collections/all" class="button">Continue Shopping</a>
     </div>
-    <div id="errorMessage" class="error-message hidden"></div>
-    <div id="successMessage" class="success-message hidden"></div>
   </div>
 
   <script>
-    (function() {
-      // Check if we're in an iframe
-      const isInIframe = window !== window.parent;
+    // Store parameters for use throughout the script
+    let params = {};
+    
+    // Function to extract and validate URL parameters
+    function getParams() {
+      const urlParams = new URLSearchParams(window.location.search);
       
-      // Function to get URL parameters
-      function getParam(name) {
-        const urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get(name);
-      }
+      // Extract all parameters
+      return {
+        variantId: urlParams.get('variant_id'),
+        customText: urlParams.get('custom_text'),
+        fontFamily: urlParams.get('font_family'),
+        fontSize: urlParams.get('font_size'),
+        textColor: urlParams.get('text_color'),
+        position: urlParams.get('position'),
+        petPhotoUrl: urlParams.get('pet_photo_url'),
+        itemKey: urlParams.get('item_key')
+      };
+    }
+    
+    // Show error message function
+    function showError(message, debugInfo) {
+      // Hide spinner, update message
+      document.getElementById('spinner').style.display = 'none';
+      document.getElementById('message').textContent = 'There was a problem updating your cart';
       
-      // Get parameters from URL
-      const variantId = getParam('variant_id');
-      const customText = getParam('custom_text');
-      const fontFamily = getParam('font_family');
-      const fontSize = getParam('font_size');
-      const textColor = getParam('text_color');
-      const position = getParam('position');
-      const petPhotoUrl = getParam('pet_photo_url');
-      const itemKey = getParam('item_key');
+      // Show error message
+      const errorEl = document.getElementById('error');
+      errorEl.textContent = message;
+      errorEl.style.display = 'block';
       
-      // Function to send message to parent if in iframe
-      function postMessageToParent(data) {
-        if (isInIframe) {
-          try {
-            window.parent.postMessage(data, '*');
-            console.log('Posted message to parent:', data);
-          } catch (e) {
-            console.error('Error posting message to parent:', e);
-          }
+      // Show debug info if available
+      if (debugInfo) {
+        const debugEl = document.getElementById('debug');
+        if (typeof debugInfo === 'object') {
+          debugEl.textContent = JSON.stringify(debugInfo, null, 2);
+        } else {
+          debugEl.textContent = debugInfo;
         }
+        debugEl.style.display = 'block';
       }
       
-      // Function to show error
-      function showError(message) {
-        document.getElementById('loading').classList.add('hidden');
-        document.getElementById('redirectText').classList.add('hidden');
-        document.getElementById('errorMessage').textContent = message;
-        document.getElementById('errorMessage').classList.remove('hidden');
-        document.getElementById('message').textContent = 'An error occurred';
-      }
+      // Show action buttons
+      document.getElementById('actions').style.display = 'block';
       
-      // Function to show success
-      function showSuccess(message) {
-        document.getElementById('loading').classList.add('hidden');
-        document.getElementById('successMessage').textContent = message;
-        document.getElementById('successMessage').classList.remove('hidden');
-        document.getElementById('message').textContent = 'Update complete!';
-      }
+      // Log error to console
+      console.error('Cart update error:', message, debugInfo);
+    }
+    
+    // Show success message function
+    function showSuccess(message) {
+      // Hide spinner, update message
+      document.getElementById('spinner').style.display = 'none';
+      document.getElementById('message').textContent = 'Successfully updated your cart!';
       
-      // Function to update cart item
-      async function updateCartItem() {
-        if (!variantId || !itemKey) {
-          showError('Missing required information (variant ID or item key)');
+      // Show success message
+      const successEl = document.getElementById('success');
+      successEl.textContent = message;
+      successEl.style.display = 'block';
+      
+      // Show action buttons
+      document.getElementById('actions').style.display = 'block';
+      
+      // Redirect to cart after delay
+      setTimeout(function() {
+        window.location.href = '/cart';
+      }, 2000);
+    }
+    
+    // Function to update cart item
+    async function updateCartItem() {
+      try {
+        // Get and validate parameters
+        params = getParams();
+        console.log('Parameters received:', params);
+        
+        // Validate required parameters
+        if (!params.variantId) {
+          showError('Missing product variant ID', params);
           return;
         }
         
-        try {
-          // First, we need to remove the existing item
-          const removeResponse = await fetch('/cart/change.js', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-              id: itemKey,
-              quantity: 0
-            })
-          });
-          
-          if (!removeResponse.ok) {
-            throw new Error(`HTTP error ${removeResponse.status}`);
-          }
-          
-          await removeResponse.json();
-          
-          // Build properties object for the new line item
-          const properties = {};
-          if (customText) properties['Custom Text'] = customText;
-          if (fontFamily) properties['Font'] = fontFamily;
-          if (fontSize) properties['Font Size'] = fontSize;
-          if (textColor) properties['Text Color'] = textColor;
-          if (position) properties['Position'] = position;
-          if (petPhotoUrl) properties['Pet Photo URL'] = petPhotoUrl;
-          
-          // Add a new item with the updated properties
-          const addResponse = await fetch('/cart/add.js', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-              items: [{
-                id: variantId,
-                quantity: 1,
-                properties: properties
-              }]
-            })
-          });
-          
-          if (!addResponse.ok) {
-            throw new Error(`HTTP error ${addResponse.status}`);
-          }
-          
-          const addData = await addResponse.json();
-          
-          // Get the cart data
-          const cartResponse = await fetch('/cart.js');
-          const cartData = await cartResponse.json();
-          
-          // Post message to parent window if in iframe
-          postMessageToParent({ 
-            type: 'update-cart-success', 
-            cartCount: cartData.item_count,
-            cartUrl: window.location.origin + '/cart'
-          });
-          
-          // Show success message
-          showSuccess('Your customization has been updated!');
-          
-          // Redirect to cart page after a short delay
-          setTimeout(() => {
-            window.location.href = '/cart';
-          }, 1500);
-        } catch (error) {
-          console.error('Error updating cart:', error);
-          showError('Failed to update your cart. Please try again.');
-          
-          // Redirect to cart even if there's an error
-          setTimeout(() => {
-            window.location.href = '/cart';
-          }, 3000);
+        if (!params.itemKey) {
+          showError('Missing item key - required to identify which cart item to update', params);
+          return;
         }
+        
+        // Format the properties object
+        const properties = {};
+        
+        // Add parameters to properties if they exist
+        if (params.customText) properties['Custom Text'] = params.customText;
+        if (params.fontFamily) properties['Font'] = params.fontFamily;
+        if (params.fontSize) properties['Font Size'] = params.fontSize;
+        if (params.textColor) properties['Text Color'] = params.textColor;
+        if (params.position) properties['Position'] = params.position;
+        if (params.petPhotoUrl) properties['Pet Photo URL'] = params.petPhotoUrl;
+        
+        console.log('Updating cart item with properties:', properties);
+        
+        try {
+          // First, get the current cart to find the line item
+          const cartResponse = await fetch('/cart.js');
+          if (!cartResponse.ok) {
+            throw new Error(`Failed to fetch cart: ${cartResponse.status} ${cartResponse.statusText}`);
+          }
+          
+          const cart = await cartResponse.json();
+          console.log('Current cart:', cart);
+          
+          // Find the item by key
+          const item = cart.items.find(i => i.key === params.itemKey);
+          if (!item) {
+            throw new Error(`Item with key ${params.itemKey} not found in cart`);
+          }
+          
+          console.log('Found item to update:', item);
+          
+          // Use the Shopify Cart API to update the item
+          // We need to use the line item index (1-based) for the API
+          const lineItemIndex = cart.items.indexOf(item) + 1;
+          
+          // Create update request data
+          const updateData = {
+            id: params.itemKey,
+            properties: properties
+          };
+          
+          console.log('Sending update request:', updateData);
+          
+          // Send the update request
+          const updateResponse = await fetch('/cart/change.js', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updateData)
+          });
+          
+          if (!updateResponse.ok) {
+            throw new Error(`Failed to update cart: ${updateResponse.status} ${updateResponse.statusText}`);
+          }
+          
+          const updatedCart = await updateResponse.json();
+          console.log('Cart updated successfully:', updatedCart);
+          
+          // Show success message and redirect
+          showSuccess('Your customized item was updated successfully!');
+          
+        } catch (fetchError) {
+          console.error('Error during cart update:', fetchError);
+          showError(
+            `Failed to update cart: ${fetchError.message}`, 
+            { error: fetchError.stack, params: params }
+          );
+        }
+        
+      } catch (error) {
+        console.error('Unexpected error during cart update:', error);
+        showError(
+          'An unexpected error occurred while updating your cart', 
+          { error: error.stack, params: params }
+        );
       }
-      
-      // Start the process when page loads
-      document.addEventListener('DOMContentLoaded', function() {
-        // Short delay to ensure everything is ready
-        setTimeout(updateCartItem, 300);
-      });
-    })();
+    }
+    
+    // Start the update process
+    document.addEventListener('DOMContentLoaded', updateCartItem);
   </script>
 </body>
 </html> 

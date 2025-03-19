@@ -68,19 +68,23 @@
     const position = button.getAttribute('data-position');
     const petPhotoUrl = button.getAttribute('data-pet-photo-url');
     
-    // Use the Cloud Run app URL instead of the Shopify store domain
-    const customizerAppUrl = "https://capri-customizer-6sablvg6la-uc.a.run.app/edit/" + productHandle;
+    // Use the Shopify bridge page for redirection first
+    const bridgeUrl = "/pages/edit-redirect-bridge";
     
     // Add parameters to the URL
-    const url = new URL(customizerAppUrl);
+    const url = new URL(bridgeUrl, window.location.origin);
     url.searchParams.append('item_key', itemKey);
     url.searchParams.append('variant_id', variantId);
+    url.searchParams.append('product_handle', productHandle);
     if (customText) url.searchParams.append('custom_text', customText);
     if (fontFamily) url.searchParams.append('font_family', fontFamily);
     if (fontSize) url.searchParams.append('font_size', fontSize);
     if (textColor) url.searchParams.append('text_color', textColor);
     if (position) url.searchParams.append('position', position);
     if (petPhotoUrl) url.searchParams.append('pet_photo_url', petPhotoUrl);
+    
+    // Log for debugging
+    console.log("Redirecting to bridge URL:", url.toString());
     
     // Navigate to the URL
     window.location.href = url.toString();

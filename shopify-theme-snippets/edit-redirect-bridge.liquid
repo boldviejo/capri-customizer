@@ -54,6 +54,47 @@
       margin-top: 20px;
       font-size: 18px;
     }
+    .error {
+      color: #d82c0d;
+      margin-top: 20px;
+      background: #fbeae5;
+      padding: 10px;
+      border-radius: 4px;
+      display: none;
+    }
+    .debug {
+      text-align: left;
+      background: #f9fafb;
+      padding: 10px;
+      border-radius: 4px;
+      border: 1px solid #e0e0e0;
+      font-family: monospace;
+      font-size: 12px;
+      overflow: auto;
+      max-height: 200px;
+      margin-top: 20px;
+      display: none;
+    }
+    .actions {
+      margin-top: 20px;
+      display: none;
+    }
+    .button {
+      display: inline-block;
+      border: 1px solid #bababa;
+      color: #323232;
+      padding: 8px 15px;
+      background: #fff;
+      border-radius: 4px;
+      text-decoration: none;
+      margin: 0 5px;
+      cursor: pointer;
+    }
+    .button-primary {
+      background: #008060;
+      color: #fff;
+      border-color: #008060;
+    }
   </style>
 </head>
 <body>
@@ -62,54 +103,127 @@
     <div class="message">
       Redirecting to customizer...
     </div>
+    <div id="error" class="error"></div>
+    <div id="debug" class="debug"></div>
+    <div id="actions" class="actions">
+      <a href="/cart" class="button">Return to Cart</a>
+      <button onclick="retryRedirect()" class="button button-primary">Try Again</button>
+    </div>
   </div>
 
   <script>
+    // Store parameters globally for retry function
+    let allParams = {};
+    let targetUrl = '';
+    
+    function showError(message, details) {
+      // Hide spinner
+      document.querySelector('.spinner').style.display = 'none';
+      
+      // Update and show error message
+      const errorElement = document.getElementById('error');
+      errorElement.textContent = message;
+      errorElement.style.display = 'block';
+      
+      // Show debug info if available
+      if (details) {
+        const debugElement = document.getElementById('debug');
+        debugElement.textContent = JSON.stringify(details, null, 2);
+        debugElement.style.display = 'block';
+      }
+      
+      // Show action buttons
+      document.getElementById('actions').style.display = 'block';
+      
+      // Update message
+      document.querySelector('.message').textContent = 'There was a problem redirecting to the customizer';
+    }
+    
+    function getParam(name) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(name);
+    }
+    
+    function retryRedirect() {
+      if (targetUrl) {
+        window.location.href = targetUrl;
+      } else {
+        showError('Unable to retry. No valid target URL available.', allParams);
+      }
+    }
+    
     (function() {
-      // Function to get URL parameters
-      function getParam(name) {
-        const urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get(name);
-      }
-      
-      // Get parameters from URL
-      const productHandle = getParam('product_handle');
-      const variantId = getParam('variant_id');
-      const customText = getParam('custom_text');
-      const fontFamily = getParam('font_family');
-      const fontSize = getParam('font_size');
-      const textColor = getParam('text_color');
-      const position = getParam('position');
-      const petPhotoUrl = getParam('pet_photo_url');
-      const itemKey = getParam('item_key');
-      
-      // Validate required parameters
-      if (!productHandle) {
-        console.error('Missing product handle');
-        alert('Error: Missing product information. Please try again.');
-        window.location.href = '/cart';
-        return;
-      }
+      try {
+        // Get parameters from URL and store them globally
+        allParams = {
+          productHandle: getParam('product_handle'),
+          variantId: getParam('variant_id'),
+          customText: getParam('custom_text'),
+          fontFamily: getParam('font_family'),
+          fontSize: getParam('font_size'),
+          textColor: getParam('text_color'),
+          position: getParam('position'),
+          petPhotoUrl: getParam('pet_photo_url'),
+          itemKey: getParam('item_key')
+        };
+        
+        // Log all parameters for debugging
+        console.log('Parameters received:', allParams);
+        
+        // Validate required parameters
+        if (!allParams.productHandle) {
+          showError('Missing product information (handle) in URL parameters', allParams);
+          return;
+        }
 
-      // Build the redirect URL to the edit page on the Cloud Run app
-      const appDomain = "https://capri-customizer-6sablvg6la-uc.a.run.app";
-      const editUrl = new URL(`${appDomain}/edit/${productHandle}`);
-      
-      // Add parameters to the URL
-      if (variantId) editUrl.searchParams.append('variant_id', variantId);
-      if (customText) editUrl.searchParams.append('custom_text', customText);
-      if (fontFamily) editUrl.searchParams.append('font_family', fontFamily);
-      if (fontSize) editUrl.searchParams.append('font_size', fontSize);
-      if (textColor) editUrl.searchParams.append('text_color', textColor);
-      if (position) editUrl.searchParams.append('position', position);
-      if (petPhotoUrl) editUrl.searchParams.append('pet_photo_url', petPhotoUrl);
-      if (itemKey) editUrl.searchParams.append('item_key', itemKey);
-      
-      // Log the URL for debugging
-      console.log('Redirecting to edit page:', editUrl.toString());
-      
-      // Redirect to the edit page
-      window.location.href = editUrl.toString();
+        // Build the redirect URL to the Cloud Run app
+        const appDomain = "https://capri-customizer-6sablvg6la-uc.a.run.app";
+        const path = `/edit/${allParams.productHandle}`;
+        
+        try {
+          // Create URL with explicit base to avoid issues
+          targetUrl = new URL(path, appDomain).toString();
+          
+          // Create search params to attach to the URL
+          const searchParams = new URLSearchParams();
+          
+          // Add parameters to the URL params
+          if (allParams.variantId) searchParams.append('variant_id', allParams.variantId);
+          if (allParams.customText) searchParams.append('custom_text', allParams.customText);
+          if (allParams.fontFamily) searchParams.append('font_family', allParams.fontFamily);
+          if (allParams.fontSize) searchParams.append('font_size', allParams.fontSize);
+          if (allParams.textColor) searchParams.append('text_color', allParams.textColor);
+          if (allParams.position) searchParams.append('position', allParams.position);
+          if (allParams.petPhotoUrl) searchParams.append('pet_photo_url', allParams.petPhotoUrl);
+          if (allParams.itemKey) searchParams.append('item_key', allParams.itemKey);
+          
+          // Compose final URL
+          const search = searchParams.toString();
+          if (search) {
+            targetUrl += '?' + search;
+          }
+          
+          // Log the final URL for debugging
+          console.log('Redirecting to edit page:', targetUrl);
+          
+          // Redirect after a short delay to ensure logs are visible
+          setTimeout(function() {
+            window.location.href = targetUrl;
+          }, 500);
+        } catch (urlError) {
+          showError('Error forming the redirect URL', {
+            error: urlError.message, 
+            baseUrl: appDomain,
+            path: path,
+            params: allParams
+          });
+        }
+      } catch (error) {
+        showError('Unexpected error during redirect', {
+          error: error.message,
+          stack: error.stack
+        });
+      }
     })();
   </script>
 </body>

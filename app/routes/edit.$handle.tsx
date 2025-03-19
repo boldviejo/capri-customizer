@@ -46,6 +46,7 @@ interface LoaderData {
     fontSize?: string;
     textColor?: string;
     position?: string;
+    textPosition?: string;
     petPhotoUrl?: string;
     variantId?: string;
     itemKey?: string;
@@ -63,6 +64,7 @@ interface ActionData {
   message: string;
   bridgeUrl?: string;
   error?: string;
+  debug?: any;
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -86,13 +88,15 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     console.log("URL search params:", rawParams);
     
     // Check for both snake_case and camelCase parameter formats to handle both Shopify and direct parameters
+    // Also ensure defaults for all parameters
     const initialValues = {
       customText: url.searchParams.get('custom_text') || url.searchParams.get('customText') || '',
       fontFamily: url.searchParams.get('font_family') || url.searchParams.get('fontFamily') || 'Arial',
       fontSize: url.searchParams.get('font_size') || url.searchParams.get('fontSize') || '16',
       textColor: url.searchParams.get('text_color') || url.searchParams.get('textColor') || '#000000',
-      position: url.searchParams.get('position') || 'center',
-      petPhotoUrl: url.searchParams.get('pet_photo_url') || url.searchParams.get('petPhotoUrl') || undefined,
+      position: url.searchParams.get('position') || url.searchParams.get('textPosition') || 'center',
+      textPosition: url.searchParams.get('text_position') || url.searchParams.get('textPosition') || url.searchParams.get('position') || 'center',
+      petPhotoUrl: url.searchParams.get('pet_photo_url') || url.searchParams.get('petPhotoUrl') || '',
       variantId: url.searchParams.get('variant_id') || url.searchParams.get('variantId') || '',
       itemKey: url.searchParams.get('item_key') || url.searchParams.get('itemKey') || ''
     };
@@ -121,7 +125,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
                 }
               }
             }
-            images(first: 1) {
+            images(first: 10) {
               edges {
                 node {
                   url
@@ -172,6 +176,36 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         }))
       };
 
+      // Validate that the variantId exists in the product
+      if (initialValues.variantId && !product.variants.some(v => v.id === initialValues.variantId)) {
+        console.warn("Variant ID not found in product variants:", initialValues.variantId);
+        console.log("Available variants:", product.variants.map(v => v.id));
+        
+        // Check if the variantId needs to be transformed to a Shopify gid format
+        const variantsById = product.variants.reduce((acc, v) => {
+          // Extract variant numeric ID from gid format
+          const numericId = v.id.replace('gid://shopify/ProductVariant/', '');
+          acc[numericId] = v.id;
+          return acc;
+        }, {} as Record<string, string>);
+        
+        // Check if we need to add the gid prefix
+        if (variantsById[initialValues.variantId]) {
+          console.log("Found variant ID by numeric ID, updating format");
+          initialValues.variantId = variantsById[initialValues.variantId];
+        } else if (initialValues.variantId.includes('gid://shopify/ProductVariant/')) {
+          // Extract numeric ID and check if it exists
+          const numericId = initialValues.variantId.replace('gid://shopify/ProductVariant/', '');
+          if (variantsById[numericId]) {
+            console.log("Variant ID format is gid, but needs normalization");
+            initialValues.variantId = variantsById[numericId];
+          }
+        } else {
+          console.log("Could not match variant ID, using first available variant");
+          initialValues.variantId = product.variants[0]?.id || '';
+        }
+      }
+
       return json({
         product,
         error: null,
@@ -215,6 +249,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const fontSize = String(formData.get("fontSize") || "16");
     const color = String(formData.get("color") || "");
     const variantId = String(formData.get("variantId") || "");
+    // Get position from multiple possible field names for compatibility
     const position = String(formData.get("position") || formData.get("textPosition") || "center");
     const uploadedImage = formData.get("uploadedImage") ? String(formData.get("uploadedImage")) : null;
     const itemKey = String(formData.get("itemKey") || "");
@@ -239,6 +274,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       });
     }
     
+    if (!itemKey) {
+      console.error("Missing item key - required for cart updates");
+      return json({
+        success: false,
+        message: "Missing item key - required for editing existing items",
+        debug: { receivedValues: { text, fontFamily, fontSize, color, variantId, position, itemKey } }
+      });
+    }
+    
     // Get the Shopify domain
     const shopifyDomain = getShopifyDomain();
     
@@ -255,6 +299,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     
     // Format the bridge URL with all parameters for updating the existing item
     try {
+      // Use URL constructor to ensure proper URL formation
       const bridgeUrl = new URL(`https://${shopifyDomain}/pages/update-cart-item-bridge`);
       
       // Add parameters using URLSearchParams for proper encoding
@@ -265,7 +310,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       bridgeUrl.searchParams.append('text_color', color);
       bridgeUrl.searchParams.append('position', position);
       
-      // Add item key to identify which cart item to update
+      // Add item key to identify which cart item to update - this is crucial
       if (itemKey) {
         bridgeUrl.searchParams.append('item_key', itemKey);
       }
@@ -309,18 +354,39 @@ export default function EditCustomizer() {
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 3;
   
+  // Log all data received from loader for debugging
+  useEffect(() => {
+    console.log("Edit page loaded with data:", {
+      hasProduct: !!product,
+      error,
+      initialValues,
+      searchParams: Object.fromEntries([...searchParams.entries()])
+    });
+  }, [product, error, initialValues, searchParams]);
+  
   // Handle the action response (success/error)
   useEffect(() => {
+    console.log("Action data received:", actionData);
+    
     if (actionData?.bridgeUrl) {
+      console.log("Preparing to redirect to bridge URL:", actionData.bridgeUrl);
+      
       // Store the bridge URL in state and session storage for retries
       setPendingBridgeRequest(actionData.bridgeUrl);
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('pendingBridgeRequest', actionData.bridgeUrl);
         sessionStorage.setItem('retryCount', '0');
+        
+        // Log the redirect action
+        console.log("Redirecting to bridge URL now...");
+        
+        // Add a small delay to ensure logs are shown before redirect
+        setTimeout(() => {
+          window.location.href = actionData.bridgeUrl as string;
+        }, 100);
       }
-      
-      // Redirect to the bridge URL
-      window.location.href = actionData.bridgeUrl;
+    } else if (actionData?.error) {
+      console.error("Action error:", actionData.error);
     }
   }, [actionData]);
   
@@ -332,20 +398,30 @@ export default function EditCustomizer() {
         const storedRetryCount = parseInt(sessionStorage.getItem('retryCount') || '0', 10);
         
         if (storedBridgeRequest) {
+          console.log("Found stored bridge request:", storedBridgeRequest);
+          console.log("Current retry count:", storedRetryCount);
+          
           setPendingBridgeRequest(storedBridgeRequest);
           setRetryCount(storedRetryCount);
           
           if (storedRetryCount < maxRetries) {
             // Increment retry count
-            sessionStorage.setItem('retryCount', (storedRetryCount + 1).toString());
+            const newRetryCount = storedRetryCount + 1;
+            sessionStorage.setItem('retryCount', newRetryCount.toString());
+            console.log("Incrementing retry count to:", newRetryCount);
+            
             // Redirect to bridge URL
+            console.log("Retrying redirect to:", storedBridgeRequest);
             window.location.href = storedBridgeRequest;
           } else {
             // Clear stored request if max retries reached
+            console.log("Max retries reached, clearing stored request");
             sessionStorage.removeItem('pendingBridgeRequest');
             sessionStorage.removeItem('retryCount');
             alert("Failed to update your cart after multiple attempts. Please try again.");
           }
+        } else {
+          console.log("No stored bridge request found");
         }
       }
     };
@@ -385,9 +461,11 @@ export default function EditCustomizer() {
     // Add the item key to the form data if available
     if (initialValues.itemKey) {
       formData.append('itemKey', initialValues.itemKey);
+      console.log("Added itemKey to form data:", initialValues.itemKey);
     }
     
     // Submit the form data to the action
+    console.log("Submitting form to action handler");
     submit(formData, { method: 'post' });
   };
   
@@ -484,7 +562,7 @@ export default function EditCustomizer() {
                       fontFamily: initialValues.fontFamily,
                       fontSize: initialValues.fontSize ? parseInt(initialValues.fontSize) : undefined,
                       textColor: initialValues.textColor,
-                      textPosition: initialValues.position,
+                      textPosition: initialValues.textPosition || initialValues.position,
                       selectedVariantId: initialValues.variantId,
                       imagePreview: initialValues.petPhotoUrl
                     }}
