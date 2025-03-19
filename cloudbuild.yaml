@@ -24,7 +24,7 @@ steps:
   - 'capri-customizer-app@$PROJECT_ID.iam.gserviceaccount.com'
   - '--allow-unauthenticated'
   - '--set-env-vars'
-  - 'GCS_BUCKET_NAME=capri-customizer-uploads,GCS_PROJECT_ID=$PROJECT_ID,NODE_ENV=production,USE_MOCK_STORAGE=true'
+  - 'GCS_BUCKET_NAME=capri-customizer-uploads,GCS_PROJECT_ID=$PROJECT_ID,NODE_ENV=production,USE_MOCK_STORAGE=true,SHOPIFY_DOMAIN=capri-dev-store.myshopify.com,SHOPIFY_STOREFRONT_API_TOKEN=27ec404f3ab614fdb943f48e56ef3739'
 
 images:
 - 'gcr.io/$PROJECT_ID/capri-customizer:$COMMIT_SHA'
