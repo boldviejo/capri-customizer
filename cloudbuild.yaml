@@ -1,0 +1,32 @@
+steps:
+# Build the container image
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '--platform', 'linux/amd64', '-t', 'gcr.io/$PROJECT_ID/capri-customizer:$COMMIT_SHA', '.']
+
+# Push the container image to Container Registry
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'gcr.io/$PROJECT_ID/capri-customizer:$COMMIT_SHA']
+
+# Deploy container image to Cloud Run
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: gcloud
+  args:
+  - 'run'
+  - 'deploy'
+  - 'capri-customizer'
+  - '--image'
+  - 'gcr.io/$PROJECT_ID/capri-customizer:$COMMIT_SHA'
+  - '--region'
+  - 'us-central1'
+  - '--platform'
+  - 'managed'
+  - '--service-account'
+  - 'capri-customizer-app@$PROJECT_ID.iam.gserviceaccount.com'
+  - '--allow-unauthenticated'
+  - '--set-env-vars'
+  - 'GCS_BUCKET_NAME=capri-customizer-uploads,GCS_PROJECT_ID=$PROJECT_ID,NODE_ENV=production,USE_MOCK_STORAGE=true'
+
+images:
+- 'gcr.io/$PROJECT_ID/capri-customizer:$COMMIT_SHA'
+
+timeout: 1800s 
