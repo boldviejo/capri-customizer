@@ -293,24 +293,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       });
     }
     
-    // After adding the item, redirect to the Shopify cart page
-    // Convert checkout URL to cart URL by replacing /checkouts/ with /cart/
-    if (cartDetails.checkoutUrl) {
-      // Extract the domain from the checkout URL
-      const shopifyDomain = getShopifyDomain();
-      // Create a cart URL from the domain
-      const cartUrl = `https://${shopifyDomain}/cart`;
-      return redirect(cartUrl);
-    }
+    // Extract the cart ID from the response
+    const newCartId = cartDetails.id;
     
-    // Return cart details if not redirecting
-    return json({
-      success: true,
-      message: "Item added to cart successfully!",
-      cartId: cartDetails.id,
-      checkoutUrl: cartDetails.checkoutUrl,
-      totalQuantity: cartDetails.totalQuantity
-    });
+    // For the cart to be accessible on the Shopify store, we need to pass the cart ID
+    // Get the Shopify domain
+    const shopifyDomain = getShopifyDomain();
+    
+    // Format: Extract ID portion from gid://shopify/Cart/c1-12345abcde...
+    const formattedCartId = newCartId.split('/').pop() || '';
+    
+    // Create a cart URL that includes the cart ID 
+    const cartUrl = `https://${shopifyDomain}/cart/${formattedCartId}`;
+    
+    // Redirect to the cart page with the cart ID
+    return redirect(cartUrl);
+    
   } catch (error) {
     console.error("Error adding to cart:", error);
     return json({
