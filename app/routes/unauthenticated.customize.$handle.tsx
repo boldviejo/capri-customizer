@@ -41,7 +41,25 @@ interface Product {
 interface LoaderData {
   product?: Product;
   error: string | null;
+  shopifyDomain?: string;
 }
+
+// Add a helper function to get the Shopify domain on the client side
+const getClientShopifyDomain = () => {
+  // This is used when the server's getShopifyDomain function isn't available on the client
+  // Default to the current hostname if we can't determine the Shopify domain
+  // You might need to adjust this logic based on your setup
+  if (typeof window !== 'undefined') {
+    // Check if we have the domain stored in localStorage (could be set during the loader)
+    const storedDomain = localStorage.getItem('shopifyDomain');
+    if (storedDomain) return storedDomain;
+    
+    // Default to the current hostname if no stored domain
+    // This assumes your app is hosted on the same domain as your Shopify store
+    return window.location.hostname;
+  }
+  return 'capri-dev-store.myshopify.com'; // Fallback default
+};
 
 export const loader = async ({ params }: LoaderFunctionArgs) => {
   const { handle } = params;
@@ -51,6 +69,9 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
       error: "Product handle is required" 
     }, { status: 400 });
   }
+
+  // Get the Shopify domain
+  const shopifyDomain = getShopifyDomain();
 
   // Check if Storefront API token is available
   if (!process.env.SHOPIFY_STOREFRONT_API_TOKEN) {
@@ -82,7 +103,8 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
             }
           ]
         },
-        error: null
+        error: null,
+        shopifyDomain
       });
     } else {
       return json({ 
@@ -154,7 +176,8 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
 
     return json({
       product,
-      error: null
+      error: null,
+      shopifyDomain
     });
   } catch (error) {
     console.error("Error loading product:", error);
@@ -335,42 +358,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       });
     }
     
-    try {
-      // Get the Shopify domain
-      const shopifyDomain = getShopifyDomain();
-      
-      // Extract variant ID and quantity from the line items
-      const lineItems = cartDetails.lines.edges;
-      if (!lineItems || lineItems.length === 0) {
-        console.error("No line items found in cart");
-        // Fallback to checkout URL if no line items found
-        return redirect(cartDetails.checkoutUrl);
-      }
-      
-      // Create a Shopify cart permalink
-      // Format: https://domain.myshopify.com/cart/{variant_id}:{quantity}
-      // For multiple items: https://domain.myshopify.com/cart/{variant_id}:{quantity},{variant_id2}:{quantity2}
-      
-      // Extract variant IDs and quantities from the cart
-      const itemsString = lineItems.map((item: any) => {
-        const variantId = item.node.merchandise.id.split('/').pop();
-        const quantity = item.node.quantity;
-        return `${variantId}:${quantity}`;
-      }).join(',');
-      
-      // Create the permalink URL for the CART, not checkout
-      // Using direct structure for cart
-      const cartUrl = `https://${shopifyDomain}/cart/${itemsString}`;
-      
-      console.log("Redirecting to cart URL:", cartUrl);
-      return redirect(cartUrl);
-      
-    } catch (error) {
-      console.error("Error constructing cart URL:", error);
-      
-      // Fallback - use the raw checkoutUrl provided by Shopify
-      return redirect(cartDetails.checkoutUrl);
-    }
+    // Instead of redirecting directly (which is causing issues),
+    // return the cart information to the client
+    return json({
+      success: true,
+      cartData: {
+        id: cartDetails.id,
+        totalQuantity: cartDetails.totalQuantity,
+        checkoutUrl: cartDetails.checkoutUrl,
+        lines: cartDetails.lines
+      },
+      message: "Item added to cart successfully"
+    });
     
   } catch (error) {
     console.error("Error adding to cart:", error);
@@ -383,7 +382,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 export default function ProductCustomizer() {
   const data = useLoaderData<typeof loader>() as LoaderData;
-  const { product, error } = data;
+  const { product, error, shopifyDomain } = data;
   const submit = useSubmit();
   const actionData = useActionData();
   
@@ -420,6 +419,13 @@ export default function ProductCustomizer() {
       setCartId(savedCartId);
     }
   }, [product]);
+  
+  // Store the Shopify domain in localStorage for client-side use
+  useEffect(() => {
+    if (shopifyDomain && typeof window !== 'undefined') {
+      localStorage.setItem('shopifyDomain', shopifyDomain);
+    }
+  }, [shopifyDomain]);
   
   if (error) {
     return (
@@ -468,31 +474,47 @@ export default function ProductCustomizer() {
   };
   
   // Handle form submission result
-  useEffect(() => {
-    // Check if there's action data in the URL (Remix stores it there after non-JS submissions)
-    const url = window.location.href;
-    if (url.includes('success=true')) {
-      // Extract data from URL if needed
-      setAddedToCart(true);
-    }
-  }, []);
-  
-  // Handle asynchronous response from form submission
   const handleActionResponse = (response: any) => {
     if (response?.success) {
       // Save cart ID for future use
-      if (response.cartId) {
-        localStorage.setItem("shopifyCartId", response.cartId);
-        setCartId(response.cartId);
+      if (response.cartData?.id) {
+        localStorage.setItem("shopifyCartId", response.cartData.id);
+        setCartId(response.cartData.id);
       }
       
       // Update cart state
-      setCheckoutUrl(response.checkoutUrl);
-      setCartQuantity(response.totalQuantity);
+      if (response.cartData) {
+        setCartQuantity(response.cartData.totalQuantity || 0);
+        setCheckoutUrl(response.cartData.checkoutUrl || "");
+      }
+      
       setAddedToCart(true);
       
       // Clear form for next item
       setCustomText("");
+      
+      // Redirect to Shopify cart page
+      if (response.cartData?.id) {
+        // Extract the variant IDs and quantities from the response to build a cart permalink
+        const lineItems = response.cartData.lines?.edges || [];
+        if (lineItems.length > 0) {
+          // Use the domain from loader data, or fall back to the client helper function
+          const domain = shopifyDomain || getClientShopifyDomain();
+          
+          // Create the permalink URL format: https://domain.myshopify.com/cart/{variant_id}:{quantity},{variant_id2}:{quantity2}
+          const itemsString = lineItems.map((item: any) => {
+            const variantId = item.node.merchandise.id.split('/').pop();
+            const quantity = item.node.quantity;
+            return `${variantId}:${quantity}`;
+          }).join(',');
+          
+          const cartUrl = `https://${domain}/cart/${itemsString}`;
+          
+          console.log("Redirecting to cart URL:", cartUrl);
+          // Redirect to the cart page
+          window.location.href = cartUrl;
+        }
+      }
     } else if (response?.message) {
       setErrorMessage(response.message);
     }
