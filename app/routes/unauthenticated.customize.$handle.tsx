@@ -296,12 +296,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     // Get the Shopify domain
     const shopifyDomain = getShopifyDomain();
     
-    // Use the cart's checkoutUrl directly - this is provided by Shopify
-    // and should direct to the correct cart page
-    const cartCheckoutUrl = cartDetails.checkoutUrl;
+    // Extract the cart ID from the response
+    const extractedCartId = cartDetails.id.split('/').pop();
     
-    // Redirect to the checkoutUrl provided by Shopify
-    return redirect(cartCheckoutUrl);
+    // Construct the cart URL - format is https://domain/cart/c/cartId
+    const cartUrl = `https://${shopifyDomain}/cart/c/${extractedCartId}`;
+    
+    // Redirect to the cart page
+    return redirect(cartUrl);
     
   } catch (error) {
     console.error("Error adding to cart:", error);
