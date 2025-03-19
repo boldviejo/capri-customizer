@@ -19,8 +19,13 @@ export default defineConfig({
   ],
   build: {
     assetsInlineLimit: 0,
+    outDir: 'public/build',
+    cssCodeSplit: true,
   },
   optimizeDeps: {
     include: ["@shopify/polaris"],
   },
+  css: {
+    postcss: true
+  }
 }) satisfies UserConfig;
