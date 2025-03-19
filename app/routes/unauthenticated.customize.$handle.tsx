@@ -210,19 +210,37 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   // Get the Shopify domain
   const shopifyDomain = getShopifyDomain();
   
+  // Format the bridge URL with all parameters
+  const bridgeUrl = `https://${shopifyDomain}/pages/add-to-cart-bridge?variant_id=${variantId}&custom_text=${encodeURIComponent(text)}&font_family=${encodeURIComponent(fontFamily)}&font_size=${encodeURIComponent(fontSize)}&text_color=${encodeURIComponent(color)}`;
+  
+  // Add pet photo URL if available
+  const finalBridgeUrl = uploadedImage 
+    ? `${bridgeUrl}&pet_photo_url=${encodeURIComponent(uploadedImage)}` 
+    : bridgeUrl;
+  
   // Check if Storefront API token is available
   if (!process.env.SHOPIFY_STOREFRONT_API_TOKEN) {
-    console.warn("SHOPIFY_STOREFRONT_API_TOKEN is not set, returning mock checkout URL");
+    console.warn("SHOPIFY_STOREFRONT_API_TOKEN is not set, returning bridge URL");
     
-    // Return a mock checkout URL for testing
+    // Return a bridge URL for testing
     return json({
       success: true,
-      checkoutUrl: `https://${shopifyDomain}/cart/${variantId}:1?attributes[Custom%20Text]=${encodeURIComponent(text)}&attributes[Font]=${encodeURIComponent(fontFamily)}&attributes[Font%20Size]=${encodeURIComponent(fontSize)}&attributes[Text%20Color]=${encodeURIComponent(color)}&attributes[Position]=${encodeURIComponent(position)}`,
-      message: "Added to cart (test mode)"
+      bridgeUrl: finalBridgeUrl,
+      message: "Redirecting to add-to-cart bridge"
     });
   }
   
   try {
+    // Even with the Storefront API token, we'll use the bridge URL approach
+    // as it works better with customizations
+    return json({
+      success: true,
+      bridgeUrl: finalBridgeUrl,
+      message: "Redirecting to add-to-cart bridge"
+    });
+    
+    /* 
+    // Commenting out the direct cart API usage in favor of the bridge
     // Create a cart
     const cartCreateQuery = `
       mutation cartCreate {
@@ -312,6 +330,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       checkoutUrl: cartAddData.cart.checkoutUrl,
       message: "Item added to cart successfully"
     });
+    */
     
   } catch (error) {
     console.error("Error in checkout process:", error);
@@ -333,9 +352,9 @@ export default function ProductCustomizer() {
   
   // Handle the action response (success/error)
   const handleActionResponse = (response: any) => {
-    if (response?.checkoutUrl) {
-      // If we have a checkout URL, redirect to it
-      window.location.href = response.checkoutUrl;
+    if (response?.bridgeUrl) {
+      // If we have a bridge URL, redirect to it
+      window.location.href = response.bridgeUrl;
     } else if (response?.error) {
       // Handle error
       alert(response.error);

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { json, redirect, type LoaderFunctionArgs, type ActionFunctionArgs, type LinksFunction } from "@remix-run/node";
-import { useLoaderData, useSubmit, Form } from "@remix-run/react";
+import { useLoaderData, useSubmit, Form, useActionData } from "@remix-run/react";
 import {
   Text,
   Card,
@@ -180,12 +180,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     // Get the Shopify domain
     const shopifyDomain = getShopifyDomain();
     
-    // Since we don't have a proper admin access, return a mock checkout URL
+    // Format the bridge URL with all parameters
+    const bridgeUrl = `https://${shopifyDomain}/pages/add-to-cart-bridge?variant_id=${variantId}&custom_text=${encodeURIComponent(text)}&font_family=${encodeURIComponent(fontFamily)}&font_size=${encodeURIComponent(fontSize)}&text_color=${encodeURIComponent(color)}`;
+    
+    // Add pet photo URL if available
+    const finalBridgeUrl = uploadedImage 
+      ? `${bridgeUrl}&pet_photo_url=${encodeURIComponent(uploadedImage)}` 
+      : bridgeUrl;
+    
+    // Return the bridge URL
     return json({
       success: true,
-      checkoutUrl: `https://${shopifyDomain}/cart/${variantId}:1?attributes[Custom%20Text]=${encodeURIComponent(text)}&attributes[Font]=${encodeURIComponent(fontFamily)}&attributes[Font%20Size]=${encodeURIComponent(fontSize)}&attributes[Text%20Color]=${encodeURIComponent(color)}&attributes[Position]=${encodeURIComponent(position)}`,
-      message: "Added to cart (test mode)"
+      bridgeUrl: finalBridgeUrl,
+      message: "Redirecting to add-to-cart bridge"
     });
+    
   } catch (error) {
     console.error("Error adding to cart:", error);
     return json({
@@ -198,7 +207,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export default function ProductCustomizer() {
   const data = useLoaderData<typeof loader>() as LoaderData;
   const { product, error } = data;
+  const actionData = useActionData<typeof action>();
   const submit = useSubmit();
+  
+  // Handle the action response (success/error)
+  useEffect(() => {
+    if (actionData?.bridgeUrl) {
+      // If we have a bridge URL, redirect to it
+      window.location.href = actionData.bridgeUrl;
+    } else if (actionData?.message && !actionData.success) {
+      // Handle error
+      alert(actionData.message);
+    }
+  }, [actionData]);
   
   const handleSubmit = (formData: FormData) => {
     submit(formData, { method: "post" });
