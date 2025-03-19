@@ -428,9 +428,39 @@ export default function ProductCustomizer() {
     { label: "Gold", value: "#FFD700" },
     { label: "Silver", value: "#C0C0C0" },
   ];
+
+  // Design template options
+  const designTemplates = [
+    { id: 'classic', name: 'Classic', textPosition: 'bottom', imageOpacity: 1 },
+    { id: 'minimal', name: 'Minimal', textPosition: 'center', imageOpacity: 0.8 },
+    { id: 'bold', name: 'Bold', textPosition: 'top', imageOpacity: 0.9 },
+    { id: 'elegant', name: 'Elegant', textPosition: 'overlay', imageOpacity: 0.7 },
+  ];
+  
+  const [selectedDesign, setSelectedDesign] = useState(designTemplates[0].id);
+  const [textPosition, setTextPosition] = useState(designTemplates[0].textPosition);
+  const [imageOpacity, setImageOpacity] = useState(designTemplates[0].imageOpacity);
+
+  // Update text position and opacity when design template changes
+  useEffect(() => {
+    const design = designTemplates.find(d => d.id === selectedDesign);
+    if (design) {
+      setTextPosition(design.textPosition);
+      setImageOpacity(design.imageOpacity);
+    }
+  }, [selectedDesign]);
+  
+  const getTextPositionStyle = () => {
+    switch(textPosition) {
+      case 'top': return { top: '20px', bottom: 'auto' };
+      case 'bottom': return { bottom: '20px', top: 'auto' };
+      case 'overlay': return { top: '50%', transform: 'translateY(-50%)' };
+      default: return { top: '50%', transform: 'translateY(-50%)' };
+    }
+  };
   
   return (
-    <div className="page-container" style={{ maxWidth: '1000px', margin: '0 auto', padding: '20px' }}>
+    <div className="page-container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
       <Card>
         <BlockStack gap="500">
           <Box padding="400">
@@ -467,130 +497,199 @@ export default function ProductCustomizer() {
               )}
               
               <InlineStack gap="500" wrap={false} align="start">
-                <div style={{ flex: '0 0 40%' }}>
-                  {product.images && product.images.length > 0 && (
-                    <img 
-                      src={product.images[0].url} 
-                      alt={product.images[0].altText || product.title}
-                      style={{ maxWidth: '100%', borderRadius: '8px' }} 
-                    />
-                  )}
+                {/* Large Preview Area (Left Side) */}
+                <div style={{ flex: '0 0 60%', height: '600px', position: 'relative', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', backgroundColor: '#f9f9f9' }}>
+                  {/* Preview Background */}
+                  <div style={{ 
+                    width: '100%', 
+                    height: '100%', 
+                    backgroundImage: petPhotoUrl ? `url(${petPhotoUrl})` : (product.images && product.images.length > 0) ? `url(${product.images[0].url})` : 'none',
+                    backgroundSize: 'contain',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                    opacity: imageOpacity,
+                    position: 'absolute',
+                    top: 0,
+                    left: 0
+                  }} />
+                  
+                  {/* Text Overlay */}
+                  <div style={{
+                    position: 'absolute',
+                    left: '50%',
+                    width: '80%',
+                    transform: 'translateX(-50%)',
+                    textAlign: 'center',
+                    ...getTextPositionStyle(),
+                    padding: '15px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    fontFamily,
+                    fontSize: `${fontSize}px`,
+                    color,
+                    transition: 'all 0.3s ease'
+                  }}>
+                    {customText || "Your text will appear here"}
+                  </div>
+                  
+                  {/* Product Title Overlay */}
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '20px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    backgroundColor: 'rgba(0,0,0,0.7)',
+                    color: 'white',
+                    padding: '8px 20px',
+                    borderRadius: '20px',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                  }}>
+                    {product.title}
+                  </div>
+                  
+                  {/* Zoom Controls */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '20px',
+                    right: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    backgroundColor: 'rgba(255,255,255,0.8)',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+                  }}>
+                    <button style={{ border: 'none', background: 'none', padding: '8px', cursor: 'pointer', borderBottom: '1px solid #eee' }}>+</button>
+                    <button style={{ border: 'none', background: 'none', padding: '8px', cursor: 'pointer' }}>−</button>
+                  </div>
                 </div>
                 
-                <div style={{ flex: '1 1 60%' }}>
-                  <BlockStack gap="400">
-                    <Form method="post" onSubmit={handleSubmit}>
-                      <BlockStack gap="400">
-                        {product.variants.length > 1 && (
-                          <Select
-                            label="Select variant"
-                            options={variantOptions}
-                            onChange={setSelectedVariantId}
-                            value={selectedVariantId}
-                          />
-                        )}
+                {/* Customization Options (Right Side) */}
+                <div style={{ flex: '1 1 40%' }}>
+                  <Form method="post" onSubmit={handleSubmit}>
+                    <Card>
+                      <Box padding="400">
+                        <BlockStack gap="400">
+                          <Text as="h2" variant="headingLg">Customize Your Item</Text>
+                          
+                          {product.variants.length > 1 && (
+                            <Select
+                              label="Select variant"
+                              options={variantOptions}
+                              onChange={setSelectedVariantId}
+                              value={selectedVariantId}
+                            />
+                          )}
                         
-                        <Divider />
-                        
-                        <CloudinaryUploader
-                          cloudName={process.env.CLOUDINARY_CLOUD_NAME || "dqnlrk9jl"}
-                          uploadPreset="capricustomizer"
-                          onImageUploaded={(url) => setPetPhotoUrl(url)}
-                          onUploadError={(error) => console.error('Upload error:', error)}
-                        />
-                        
-                        <Divider />
-                        
-                        <TextField
-                          label="Your Custom Text"
-                          value={customText}
-                          onChange={setCustomText}
-                          autoComplete="off"
-                          placeholder="Enter text for your customization"
-                        />
-                        
-                        <Select
-                          label="Font Style"
-                          options={fontOptions}
-                          onChange={setFontFamily}
-                          value={fontFamily}
-                        />
-                        
-                        <Select
-                          label="Font Size"
-                          options={fontSizeOptions}
-                          onChange={(value) => setFontSize(parseInt(value, 10))}
-                          value={fontSize.toString()}
-                        />
-                        
-                        <Box paddingBlockStart="200" paddingBlockEnd="200">
-                          <Text as="h3" variant="headingMd">Text Color</Text>
-                          <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-                            {colorOptions.map((option) => (
+                          <Divider />
+                          
+                          <Text as="h3" variant="headingMd">Choose Design</Text>
+                          <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', padding: '4px 0' }}>
+                            {designTemplates.map(design => (
                               <div 
-                                key={option.value}
-                                onClick={() => setColor(option.value)}
+                                key={design.id}
+                                onClick={() => setSelectedDesign(design.id)}
                                 style={{
-                                  width: '36px',
-                                  height: '36px',
-                                  backgroundColor: option.value,
-                                  borderRadius: '50%',
+                                  width: '80px',
+                                  height: '80px',
+                                  border: selectedDesign === design.id ? '3px solid #8b5cf6' : '1px solid #e5e7eb',
+                                  borderRadius: '8px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
                                   cursor: 'pointer',
-                                  border: color === option.value ? '3px solid #000' : '1px solid #ccc',
+                                  padding: '8px',
+                                  backgroundColor: selectedDesign === design.id ? '#f5f3ff' : '#fff',
+                                  transition: 'all 0.2s ease',
+                                  fontSize: '11px'
                                 }}
-                                title={option.label}
-                              />
+                              >
+                                <div style={{ width: '60px', height: '45px', backgroundColor: '#e5e7eb', borderRadius: '4px', marginBottom: '6px' }} />
+                                <span>{design.name}</span>
+                              </div>
                             ))}
                           </div>
-                        </Box>
-                        
-                        <Box paddingBlockStart="200">
-                          <Text as="h3" variant="headingMd">Preview</Text>
-                          <div 
-                            style={{ 
-                              fontFamily, 
-                              fontSize: `${fontSize}px`, 
-                              color: color,
-                              padding: '20px',
-                              border: '1px dashed #ccc',
-                              borderRadius: '8px',
-                              minHeight: '100px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              marginTop: '8px',
-                              backgroundColor: '#f9f9f9',
-                              backgroundImage: petPhotoUrl ? `url(${petPhotoUrl})` : 'none',
-                              backgroundSize: petPhotoUrl ? 'cover' : 'auto',
-                              backgroundPosition: 'center',
-                              position: 'relative'
-                            }}
-                          >
-                            <div style={{
-                              backgroundColor: 'rgba(255, 255, 255, 0.7)',
-                              padding: '10px',
-                              borderRadius: '4px',
-                              maxWidth: '80%'
-                            }}>
-                              {customText || "Your text will appear here"}
+                          
+                          <Divider />
+                          
+                          <CloudinaryUploader
+                            cloudName={process.env.CLOUDINARY_CLOUD_NAME || "dqnlrk9jl"}
+                            uploadPreset="capricustomizer"
+                            onImageUploaded={(url) => setPetPhotoUrl(url)}
+                            onUploadError={(error) => console.error('Upload error:', error)}
+                          />
+                          
+                          <Divider />
+                          
+                          <TextField
+                            label="Your Custom Text"
+                            value={customText}
+                            onChange={setCustomText}
+                            autoComplete="off"
+                            placeholder="Enter text for your customization"
+                          />
+                          
+                          <InlineStack gap="300" wrap={true}>
+                            <div style={{ flex: '1 1 48%', minWidth: '120px' }}>
+                              <Select
+                                label="Font Style"
+                                options={fontOptions}
+                                onChange={setFontFamily}
+                                value={fontFamily}
+                              />
                             </div>
-                          </div>
-                        </Box>
-                        
-                        <Box paddingBlockStart="400">
-                          <Button 
-                            submit
-                            variant="primary" 
-                            disabled={!customText || !selectedVariantId || !petPhotoUrl}
-                            size="large"
-                            fullWidth
-                          >
-                            Add Customized Item to Cart
-                          </Button>
-                        </Box>
-                      </BlockStack>
-                    </Form>
-                  </BlockStack>
+                            <div style={{ flex: '1 1 48%', minWidth: '120px' }}>
+                              <Select
+                                label="Font Size"
+                                options={fontSizeOptions}
+                                onChange={(value) => setFontSize(parseInt(value, 10))}
+                                value={fontSize.toString()}
+                              />
+                            </div>
+                          </InlineStack>
+                          
+                          <Box paddingBlockStart="200" paddingBlockEnd="200">
+                            <Text as="h3" variant="headingMd">Text Color</Text>
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+                              {colorOptions.map((option) => (
+                                <div 
+                                  key={option.value}
+                                  onClick={() => setColor(option.value)}
+                                  style={{
+                                    width: '36px',
+                                    height: '36px',
+                                    backgroundColor: option.value,
+                                    borderRadius: '50%',
+                                    cursor: 'pointer',
+                                    border: color === option.value ? '3px solid #8b5cf6' : '1px solid #ccc',
+                                    boxShadow: color === option.value ? '0 0 0 2px rgba(139, 92, 246, 0.3)' : 'none'
+                                  }}
+                                  title={option.label}
+                                />
+                              ))}
+                            </div>
+                          </Box>
+                          
+                          <Divider />
+                          
+                          <Box paddingBlockStart="400">
+                            <Button 
+                              submit
+                              variant="primary" 
+                              disabled={!customText || !selectedVariantId || !petPhotoUrl}
+                              size="large"
+                              fullWidth
+                            >
+                              Add to Cart
+                            </Button>
+                          </Box>
+                        </BlockStack>
+                      </Box>
+                    </Card>
+                  </Form>
                 </div>
               </InlineStack>
               

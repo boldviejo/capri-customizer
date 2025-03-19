@@ -1,0 +1,75 @@
+{% comment %}
+  INSTRUCTIONS FOR MODIFYING YOUR SHOPIFY THEME TO DISPLAY PET PHOTO URL
+  
+  This snippet demonstrates how to modify your Shopify theme to properly display
+  line item properties including the Pet Photo URL in the cart.
+  
+  1. Locate your cart template file in your theme:
+     Online Store > Themes > Actions > Edit code > Sections > cart-template.liquid 
+     (or similar, depending on your theme)
+  
+  2. Find where line items are looped through, it typically looks like:
+     {% for item in cart.items %}
+       {% include 'cart-item' with item %}
+     {% endfor %}
+  
+  3. Modify your theme's cart item template:
+     - Find the cart-item.liquid snippet or the code inside the line item loop
+     - Add the following code where you want the properties to appear:
+{% endcomment %}
+
+{% comment %}ADD THIS CODE TO YOUR CART ITEM TEMPLATE{% endcomment %}
+{% if item.properties.size > 0 %}
+  <div class="cart-item__properties">
+    <h4>Customization Details:</h4>
+    <ul>
+      {% for property in item.properties %}
+        {% assign property_first = property.first | downcase %}
+        {% unless property_first contains '_' %}
+          <li>
+            <strong>{{ property.first }}:</strong> 
+            {% if property.first == 'Pet Photo URL' %}
+              <a href="{{ property.last }}" target="_blank">View Pet Photo</a>
+              <div class="pet-photo-preview">
+                <img src="{{ property.last }}" alt="Pet Photo Preview" style="max-width: 100px; max-height: 100px; margin-top: 5px;">
+              </div>
+            {% else %}
+              {{ property.last }}
+            {% endif %}
+          </li>
+        {% endunless %}
+      {% endfor %}
+    </ul>
+  </div>
+  
+  <style>
+    .cart-item__properties {
+      margin-top: 10px;
+      font-size: 0.9em;
+    }
+    .cart-item__properties ul {
+      list-style: none;
+      padding-left: 5px;
+      margin: 5px 0;
+    }
+    .cart-item__properties li {
+      margin-bottom: 5px;
+    }
+    .pet-photo-preview {
+      margin-top: 5px;
+    }
+  </style>
+{% endif %}
+
+{% comment %}
+  4. Save your changes and refresh your theme cache.
+  
+  ALTERNATIVE APPROACH:
+  If you're using a drawer cart or Ajax cart, you might need to modify those templates as well.
+  The files are often named:
+  - cart-drawer.liquid
+  - ajax-cart.liquid
+  - or included in your theme's main cart JavaScript
+  
+  The same loop pattern should be used in these files.
+{% endcomment %} 
