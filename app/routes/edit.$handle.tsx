@@ -16,6 +16,8 @@ import ModernCustomizer from "~/components/ModernCustomizer";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: "https://unpkg.com/@shopify/polaris@11.0.0/build/esm/styles.css" },
+  { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" },
+  { rel: "stylesheet", href: "/customizer-styles.css" },
 ];
 
 // Define types for our data
@@ -572,67 +574,166 @@ export default function EditCustomizer() {
     return (
       <div className="customizer-container">
         <div className="customizer-header">
-          <Text variant="heading2xl" as="h1">Confirm Your Customization</Text>
-          <Text as="p">Your customization is ready to be updated in your cart</Text>
+          <Text variant="heading2xl" as="h1">Review Your Customization</Text>
+          <Text as="p">Make sure everything looks good before updating your cart</Text>
         </div>
         
         <Divider />
         
-        <BlockStack gap="400">
-          <Card>
-            <BlockStack gap="400">
-              <Box padding="400">
-                <Banner
-                  title="Your customization has been prepared"
-                  tone="success"
-                >
-                  <p>Review your customization details before finalizing the update to your cart.</p>
-                </Banner>
-                
-                <div style={{ marginTop: "20px" }}>
-                  <Text variant="headingMd" as="h2">Customization Details</Text>
-                  <ul style={{ marginTop: "10px" }}>
-                    <li><strong>Product:</strong> {product?.title}</li>
-                    <li><strong>Custom Text:</strong> {initialValues.customText}</li>
-                    <li><strong>Font:</strong> {initialValues.fontFamily}</li>
-                    <li><strong>Font Size:</strong> {initialValues.fontSize}</li>
-                    <li><strong>Text Color:</strong> {initialValues.textColor}</li>
-                    <li><strong>Position:</strong> {initialValues.position || initialValues.textPosition}</li>
-                    {initialValues.petPhotoUrl && <li><strong>Pet Photo:</strong> Included</li>}
-                  </ul>
-                </div>
-                
-                <div style={{ marginTop: "20px", display: "flex", gap: "10px" }}>
-                  <Button variant="primary" onClick={confirmUpdate}>
-                    Update Cart Item
-                  </Button>
-                  <Button variant="plain" onClick={() => {
-                    // Clear the pending bridge request
-                    setPendingBridgeRequest(null);
-                    if (typeof window !== 'undefined') {
-                      sessionStorage.removeItem('pendingBridgeRequest');
-                      sessionStorage.removeItem('retryCount');
-                      sessionStorage.removeItem('redirectAttempt');
-                    }
-                  }}>
-                    Edit Again
-                  </Button>
-                  <Button variant="plain" onClick={() => {
-                    // Clear any redirect related data
-                    if (typeof window !== 'undefined') {
-                      sessionStorage.removeItem('redirectAttempt');
-                      sessionStorage.removeItem('pendingBridgeRequest');
-                      sessionStorage.removeItem('retryCount');
-                    }
-                    window.location.href = '/cart';
-                  }}>
-                    Cancel and Return to Cart
-                  </Button>
-                </div>
-              </Box>
-            </BlockStack>
-          </Card>
-        </BlockStack>
+        <div className="p-6">
+          <BlockStack gap="800">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Preview Section */}
+              <Card>
+                <BlockStack gap="400">
+                  <Box padding="400">
+                    <div className="preview-container" style={{ minHeight: "400px" }}>
+                      {initialValues.petPhotoUrl && (
+                        <div className="relative h-full w-full flex items-center justify-center">
+                          <img 
+                            src={initialValues.petPhotoUrl} 
+                            alt={product?.title} 
+                            className="object-contain max-w-full max-h-full"
+                          />
+                          {initialValues.customText && (
+                            <div 
+                              style={{
+                                position: 'absolute',
+                                top: '50%',
+                                left: '50%',
+                                transform: 'translate(-50%, -50%)',
+                                color: initialValues.textColor,
+                                fontFamily: initialValues.fontFamily,
+                                fontSize: initialValues.fontSize,
+                                textAlign: 'center',
+                                whiteSpace: 'pre-wrap',
+                                maxWidth: '100%',
+                                maxHeight: '100%',
+                                overflow: 'hidden',
+                                textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)'
+                              }}
+                            >
+                              {initialValues.customText}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </Box>
+                </BlockStack>
+              </Card>
+
+              {/* Details Section */}
+              <Card>
+                <BlockStack gap="400">
+                  <Box padding="400">
+                    <Banner
+                      title="Ready to update your cart"
+                      tone="success"
+                    >
+                      <p>Your customization is ready to be added to your cart.</p>
+                    </Banner>
+                    
+                    <div className="mt-6">
+                      <Text variant="headingMd" as="h2" fontWeight="semibold">Customization Details</Text>
+                      
+                      <div className="mt-4 divide-y divide-gray-200">
+                        <div className="py-3 flex justify-between">
+                          <Text variant="bodyMd" as="span" tone="subdued">Product</Text>
+                          <Text variant="bodyMd" as="span" fontWeight="medium">{product?.title}</Text>
+                        </div>
+                        
+                        <div className="py-3 flex justify-between">
+                          <Text variant="bodyMd" as="span" tone="subdued">Custom Text</Text>
+                          <div className="text-right max-w-[60%] truncate">
+                            <Text variant="bodyMd" as="span" fontWeight="medium">{initialValues.customText}</Text>
+                          </div>
+                        </div>
+                        
+                        <div className="py-3 flex justify-between">
+                          <Text variant="bodyMd" as="span" tone="subdued">Font</Text>
+                          <div style={{ fontFamily: initialValues.fontFamily }}>
+                            <Text variant="bodyMd" as="span" fontWeight="medium">{initialValues.fontFamily}</Text>
+                          </div>
+                        </div>
+                        
+                        <div className="py-3 flex justify-between">
+                          <Text variant="bodyMd" as="span" tone="subdued">Font Size</Text>
+                          <Text variant="bodyMd" as="span" fontWeight="medium">{initialValues.fontSize}px</Text>
+                        </div>
+                        
+                        <div className="py-3 flex justify-between items-center">
+                          <Text variant="bodyMd" as="span" tone="subdued">Text Color</Text>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-4 h-4 rounded-full" 
+                              style={{ 
+                                backgroundColor: initialValues.textColor,
+                                border: initialValues.textColor === '#FFFFFF' ? '1px solid #e5e7eb' : 'none'
+                              }}
+                            ></div>
+                            <Text variant="bodyMd" as="span" fontWeight="medium">{initialValues.textColor}</Text>
+                          </div>
+                        </div>
+                        
+                        <div className="py-3 flex justify-between">
+                          <Text variant="bodyMd" as="span" tone="subdued">Position</Text>
+                          <div className="capitalize">
+                            <Text variant="bodyMd" as="span" fontWeight="medium">{initialValues.position || initialValues.textPosition}</Text>
+                          </div>
+                        </div>
+                        
+                        {initialValues.petPhotoUrl && (
+                          <div className="py-3 flex justify-between">
+                            <Text variant="bodyMd" as="span" tone="subdued">Pet Photo</Text>
+                            <Text variant="bodyMd" as="span" fontWeight="medium">Included</Text>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="mt-8 space-y-3">
+                      <button
+                        onClick={confirmUpdate}
+                        className="btn btn-primary w-full py-3.5"
+                      >
+                        Update Cart Item
+                      </button>
+                      
+                      <button
+                        onClick={() => {
+                          setPendingBridgeRequest(null);
+                          if (typeof window !== 'undefined') {
+                            sessionStorage.removeItem('pendingBridgeRequest');
+                            sessionStorage.removeItem('retryCount');
+                            sessionStorage.removeItem('redirectAttempt');
+                          }
+                        }}
+                        className="btn btn-secondary w-full"
+                      >
+                        Edit Again
+                      </button>
+                      
+                      <button
+                        onClick={() => {
+                          if (typeof window !== 'undefined') {
+                            sessionStorage.removeItem('redirectAttempt');
+                            sessionStorage.removeItem('pendingBridgeRequest');
+                            sessionStorage.removeItem('retryCount');
+                          }
+                          window.location.href = '/cart';
+                        }}
+                        className="btn btn-secondary w-full"
+                      >
+                        Cancel and Return to Cart
+                      </button>
+                    </div>
+                  </Box>
+                </BlockStack>
+              </Card>
+            </div>
+          </BlockStack>
+        </div>
       </div>
     );
   }
