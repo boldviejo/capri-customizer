@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { json, redirect, type LoaderFunctionArgs, type ActionFunctionArgs, type LinksFunction } from "@remix-run/node";
-import { useLoaderData, useSubmit, Form } from "@remix-run/react";
+import { useLoaderData, useSubmit, Form, useActionData } from "@remix-run/react";
 import {
   Text,
   Card,
@@ -188,6 +188,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const fontSize = Number(formData.get("fontSize") || 16);
   const color = String(formData.get("color") || "");
   const variantId = String(formData.get("variantId") || "");
+  const cartId = String(formData.get("cartId") || "");
   
   if (!text || !fontFamily || !fontSize || !color || !variantId) {
     return json({
@@ -197,6 +198,89 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
   
   try {
+    let query = '';
+    let variables: any = {};
+    
+    if (cartId) {
+      // If we have a cart ID, add to existing cart
+      query = `
+        mutation addToCart($cartId: ID!, $variantId: ID!, $customText: String!, $fontFamily: String!, $fontSize: String!, $color: String!) {
+          cartLinesAdd(
+            cartId: $cartId,
+            lines: [
+              {
+                quantity: 1
+                merchandiseId: $variantId
+                attributes: [
+                  { key: "Custom Text", value: $customText }
+                  { key: "Font", value: $fontFamily }
+                  { key: "Font Size", value: $fontSize }
+                  { key: "Text Color", value: $color }
+                ]
+              }
+            ]
+          ) {
+            cart {
+              id
+              checkoutUrl
+              totalQuantity
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+      variables = {
+        cartId,
+        variantId,
+        customText: text,
+        fontFamily,
+        fontSize: fontSize.toString(),
+        color,
+      };
+    } else {
+      // Create a new cart
+      query = `
+        mutation createCart($variantId: ID!, $customText: String!, $fontFamily: String!, $fontSize: String!, $color: String!) {
+          cartCreate(
+            input: {
+              lines: [
+                {
+                  quantity: 1
+                  merchandiseId: $variantId
+                  attributes: [
+                    { key: "Custom Text", value: $customText }
+                    { key: "Font", value: $fontFamily }
+                    { key: "Font Size", value: $fontSize }
+                    { key: "Text Color", value: $color }
+                  ]
+                }
+              ]
+            }
+          ) {
+            cart {
+              id
+              checkoutUrl
+              totalQuantity
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+      variables = {
+        variantId,
+        customText: text,
+        fontFamily,
+        fontSize: fontSize.toString(),
+        color,
+      };
+    }
+
     // Create cart and add item using Storefront API
     const response = await fetch(
       `https://${SHOP_DOMAIN}/api/2024-01/graphql.json`,
@@ -207,65 +291,42 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           "X-Shopify-Storefront-Access-Token": process.env.SHOPIFY_STOREFRONT_API_TOKEN || "",
         },
         body: JSON.stringify({
-          query: `
-            mutation createCart($variantId: ID!, $customText: String!, $fontFamily: String!, $fontSize: String!, $color: String!) {
-              cartCreate(
-                input: {
-                  lines: [
-                    {
-                      quantity: 1
-                      merchandiseId: $variantId
-                      attributes: [
-                        { key: "Custom Text", value: $customText }
-                        { key: "Font", value: $fontFamily }
-                        { key: "Font Size", value: $fontSize }
-                        { key: "Text Color", value: $color }
-                      ]
-                    }
-                  ]
-                }
-              ) {
-                cart {
-                  checkoutUrl
-                }
-                userErrors {
-                  field
-                  message
-                }
-              }
-            }
-          `,
-          variables: {
-            variantId,
-            customText: text,
-            fontFamily,
-            fontSize: fontSize.toString(),
-            color,
-          },
+          query,
+          variables,
         }),
       }
     );
 
     const responseData = await response.json();
     
-    if (responseData.data?.cartCreate?.userErrors?.length > 0) {
+    // Determine which response structure we get based on the query used
+    const operationName = cartId ? 'cartLinesAdd' : 'cartCreate';
+    const userErrors = responseData.data?.[operationName]?.userErrors || [];
+    
+    if (userErrors.length > 0) {
       return json({
         success: false,
-        message: "Failed to add item to cart"
+        message: userErrors[0].message || "Failed to add item to cart"
       });
     }
     
-    const checkoutUrl = responseData.data?.cartCreate?.cart?.checkoutUrl;
+    const cartDetails = responseData.data?.[operationName]?.cart;
     
-    if (!checkoutUrl) {
+    if (!cartDetails) {
       return json({
         success: false,
-        message: "Failed to create checkout URL"
+        message: "Failed to create or update cart"
       });
     }
     
-    // Redirect to checkout
-    return redirect(checkoutUrl);
+    // Return cart details instead of redirecting
+    return json({
+      success: true,
+      message: "Item added to cart successfully!",
+      cartId: cartDetails.id,
+      checkoutUrl: cartDetails.checkoutUrl,
+      totalQuantity: cartDetails.totalQuantity
+    });
   } catch (error) {
     console.error("Error adding to cart:", error);
     return json({
@@ -279,6 +340,7 @@ export default function ProductCustomizer() {
   const data = useLoaderData<typeof loader>() as LoaderData;
   const { product, error } = data;
   const submit = useSubmit();
+  const actionData = useActionData();
   
   const [customText, setCustomText] = useState("");
   const [selectedVariantId, setSelectedVariantId] = useState("");
@@ -286,11 +348,31 @@ export default function ProductCustomizer() {
   const [fontSize, setFontSize] = useState(16);
   const [textColor, setTextColor] = useState("#000000");
   
+  // Cart state
+  const [cartId, setCartId] = useState("");
+  const [cartQuantity, setCartQuantity] = useState(0);
+  const [checkoutUrl, setCheckoutUrl] = useState("");
+  const [addedToCart, setAddedToCart] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  
+  // Process action data when it changes
+  useEffect(() => {
+    if (actionData) {
+      handleActionResponse(actionData);
+    }
+  }, [actionData]);
+  
   // Set the default variant when the product loads
   useEffect(() => {
     if (product && product.variants.length > 0) {
       const availableVariant = product.variants.find((v: ProductVariant) => v.availableForSale);
       setSelectedVariantId(availableVariant?.id || product.variants[0].id);
+    }
+    
+    // Load cart ID from localStorage if available
+    const savedCartId = localStorage.getItem("shopifyCartId");
+    if (savedCartId) {
+      setCartId(savedCartId);
     }
   }, [product]);
   
@@ -318,19 +400,57 @@ export default function ProductCustomizer() {
     );
   }
   
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    setAddedToCart(false);
+    setErrorMessage("");
     
-    submit(
-      {
-        text: customText,
-        fontFamily,
-        fontSize: fontSize.toString(),
-        color: textColor,
-        variantId: selectedVariantId,
-      },
-      { method: "post" }
-    );
+    const formData = new FormData();
+    formData.append("text", customText);
+    formData.append("fontFamily", fontFamily);
+    formData.append("fontSize", fontSize.toString());
+    formData.append("color", textColor);
+    formData.append("variantId", selectedVariantId);
+    
+    // Add cart ID if we have one
+    if (cartId) {
+      formData.append("cartId", cartId);
+    }
+    
+    const response = await submit(formData, { method: "post", replace: true });
+    
+    // The response is handled by useActionData in a useEffect below
+  };
+  
+  // Handle form submission result
+  useEffect(() => {
+    // Check if there's action data in the URL (Remix stores it there after non-JS submissions)
+    const url = window.location.href;
+    if (url.includes('success=true')) {
+      // Extract data from URL if needed
+      setAddedToCart(true);
+    }
+  }, []);
+  
+  // Handle asynchronous response from form submission
+  const handleActionResponse = (response: any) => {
+    if (response?.success) {
+      // Save cart ID for future use
+      if (response.cartId) {
+        localStorage.setItem("shopifyCartId", response.cartId);
+        setCartId(response.cartId);
+      }
+      
+      // Update cart state
+      setCheckoutUrl(response.checkoutUrl);
+      setCartQuantity(response.totalQuantity);
+      setAddedToCart(true);
+      
+      // Clear form for next item
+      setCustomText("");
+    } else if (response?.message) {
+      setErrorMessage(response.message);
+    }
   };
   
   const variantOptions = product.variants.map((variant: ProductVariant) => ({
@@ -369,6 +489,35 @@ export default function ProductCustomizer() {
           <Box padding="400">
             <BlockStack gap="400">
               <Text as="h1" variant="headingXl">{product.title}</Text>
+              
+              {addedToCart && (
+                <Card>
+                  <BlockStack gap="200">
+                    <Box padding="300">
+                      <BlockStack gap="200">
+                        <Text as="p" fontWeight="bold" tone="success">Your customized item has been added to cart!</Text>
+                        <Text as="p">You have {cartQuantity} item(s) in your cart.</Text>
+                        <InlineStack gap="200" align="start">
+                          <Button url={checkoutUrl} target="_blank">
+                            Proceed to Checkout
+                          </Button>
+                          <Button onClick={() => setAddedToCart(false)} variant="plain">
+                            Add Another Item
+                          </Button>
+                        </InlineStack>
+                      </BlockStack>
+                    </Box>
+                  </BlockStack>
+                </Card>
+              )}
+              
+              {errorMessage && (
+                <Card>
+                  <Box padding="300">
+                    <Text as="p" tone="critical">{errorMessage}</Text>
+                  </Box>
+                </Card>
+              )}
               
               <InlineStack gap="500" wrap={false} align="start">
                 <div style={{ flex: '0 0 40%' }}>
