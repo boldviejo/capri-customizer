@@ -10,13 +10,12 @@ import {
   Button,
   Spinner,
 } from "@shopify/polaris";
-import polarisStyles from "@shopify/polaris/build/esm/styles.css";
 
 // Define the shop domain
 const SHOP_DOMAIN = "capri-dev-store.myshopify.com";
 
 export const links: LinksFunction = () => [
-  { rel: "stylesheet", href: polarisStyles },
+  { rel: "stylesheet", href: "https://unpkg.com/@shopify/polaris@11.0.0/build/esm/styles.css" },
 ];
 
 interface Product {

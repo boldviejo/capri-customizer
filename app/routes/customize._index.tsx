@@ -13,10 +13,9 @@ import {
 } from "@shopify/polaris";
 
 import { authenticate } from "../shopify.server";
-import polarisStyles from "@shopify/polaris/build/esm/styles.css";
 
 export const links: LinksFunction = () => [
-  { rel: "stylesheet", href: polarisStyles },
+  { rel: "stylesheet", href: "https://unpkg.com/@shopify/polaris@11.0.0/build/esm/styles.css" },
 ];
 
 interface Product {
