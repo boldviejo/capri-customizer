@@ -214,6 +214,27 @@ export const action = async ({ request }: ActionFunctionArgs) => {
               id
               checkoutUrl
               totalQuantity
+              lines(first: 10) {
+                edges {
+                  node {
+                    id
+                    quantity
+                    merchandise {
+                      ... on ProductVariant {
+                        id
+                        title
+                        product {
+                          title
+                        }
+                      }
+                    }
+                    attributes {
+                      key
+                      value
+                    }
+                  }
+                }
+              }
             }
             userErrors {
               field
@@ -254,6 +275,27 @@ export const action = async ({ request }: ActionFunctionArgs) => {
               id
               checkoutUrl
               totalQuantity
+              lines(first: 10) {
+                edges {
+                  node {
+                    id
+                    quantity
+                    merchandise {
+                      ... on ProductVariant {
+                        id
+                        title
+                        product {
+                          title
+                        }
+                      }
+                    }
+                    attributes {
+                      key
+                      value
+                    }
+                  }
+                }
+              }
             }
             userErrors {
               field
@@ -296,14 +338,49 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     // Get the Shopify domain
     const shopifyDomain = getShopifyDomain();
     
-    // Extract the cart ID from the response
-    const extractedCartId = cartDetails.id.split('/').pop();
-    
-    // Construct the cart URL - format is https://domain/cart/c/cartId
-    const cartUrl = `https://${shopifyDomain}/cart/c/${extractedCartId}`;
-    
-    // Redirect to the cart page
-    return redirect(cartUrl);
+    try {
+      // The cart ID from the API includes both the ID and the key separated by a ?
+      // Format: gid://shopify/Cart/c1-abc123...?key=abc123...
+      const cartId = cartDetails.id;
+      
+      // Extract just the ID portion (everything before the '?')
+      const [baseId, keyPart] = cartId.split('?');
+      
+      // Get the last part of the ID after the last '/'
+      const idParts = baseId.split('/');
+      const cartToken = idParts[idParts.length - 1];
+      
+      // Extract the key value if it exists
+      let key = '';
+      if (keyPart && keyPart.startsWith('key=')) {
+        key = keyPart.substring(4); // Remove 'key=' prefix
+      } else {
+        // If we can't get the key from the ID, try to extract from checkoutUrl
+        try {
+          const checkoutUrl = new URL(cartDetails.checkoutUrl);
+          key = checkoutUrl.searchParams.get('key') || '';
+        } catch (e) {
+          console.error("Could not parse checkout URL:", e);
+        }
+      }
+      
+      // Construct the cart URL with the proper format
+      let cartUrl;
+      if (key) {
+        cartUrl = `https://${shopifyDomain}/cart/c/${cartToken}?key=${key}`;
+      } else {
+        cartUrl = `https://${shopifyDomain}/cart/c/${cartToken}`;
+      }
+      
+      console.log("Redirecting to cart URL:", cartUrl);
+      return redirect(cartUrl);
+      
+    } catch (error) {
+      console.error("Error constructing cart URL:", error);
+      
+      // Fallback - use the raw checkoutUrl provided by Shopify
+      return redirect(cartDetails.checkoutUrl);
+    }
     
   } catch (error) {
     console.error("Error adding to cart:", error);
