@@ -9,13 +9,9 @@ import {
 import { HeroUIProvider } from "@heroui/react";
 import type { LinksFunction } from "@remix-run/node";
 
-// Import CSS files as URL imports
-import heroUiStylesHref from "@heroui/react/dist/index.css?url";
-import tailwindStylesHref from "~/styles/tailwind.css?url";
-
 export const links: LinksFunction = () => [
-  { rel: "stylesheet", href: heroUiStylesHref },
-  { rel: "stylesheet", href: tailwindStylesHref },
+  { rel: "stylesheet", href: "https://cdn.jsdelivr.net/npm/@heroui/react/dist/index.css" },
+  { rel: "stylesheet", href: "/styles/tailwind.css" },
 ];
 
 export default function App() {

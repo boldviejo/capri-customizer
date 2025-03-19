@@ -24,8 +24,5 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ["@shopify/polaris"],
-  },
-  css: {
-    postcss: true
   }
 }) satisfies UserConfig;
