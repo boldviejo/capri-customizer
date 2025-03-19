@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { json, type LoaderFunctionArgs } from "@remix-run/node";
+import { json, type LoaderFunctionArgs, type LinksFunction } from "@remix-run/node";
 import { useLoaderData, Link } from "@remix-run/react";
 import {
   Text,
@@ -10,10 +10,14 @@ import {
   Button,
   Spinner,
 } from "@shopify/polaris";
-import "@shopify/polaris/build/esm/styles.css";
+import polarisStyles from "@shopify/polaris/build/esm/styles.css";
 
 // Define the shop domain
 const SHOP_DOMAIN = "capri-dev-store.myshopify.com";
+
+export const links: LinksFunction = () => [
+  { rel: "stylesheet", href: polarisStyles },
+];
 
 interface Product {
   id: string;
@@ -32,6 +36,37 @@ interface LoaderData {
 }
 
 export const loader = async () => {
+  // Check if Storefront API token is available
+  if (!process.env.SHOPIFY_STOREFRONT_API_TOKEN) {
+    console.warn("SHOPIFY_STOREFRONT_API_TOKEN is not set, returning mock data");
+    // Return mock data when the token is not available
+    return json({
+      products: [
+        {
+          id: "gid://shopify/Product/1",
+          title: "Sample Product 1",
+          handle: "sample-product-1",
+          description: "This is a sample product that will appear when the Storefront API token is not configured.",
+          featuredImage: {
+            url: "https://via.placeholder.com/640x480",
+            altText: "Sample product image"
+          }
+        },
+        {
+          id: "gid://shopify/Product/2",
+          title: "Sample Product 2",
+          handle: "sample-product-2",
+          description: "Another sample product for demonstration purposes when the API is not available.",
+          featuredImage: {
+            url: "https://via.placeholder.com/640x480",
+            altText: "Sample product image"
+          }
+        }
+      ],
+      error: null
+    });
+  }
+
   try {
     // Get products using Storefront API
     const response = await fetch(
@@ -66,6 +101,13 @@ export const loader = async () => {
     );
 
     const responseData = await response.json();
+    
+    // Check if we have valid data
+    if (!responseData.data || !responseData.data.products) {
+      console.error("Invalid response from Storefront API:", responseData);
+      throw new Error("Invalid response from Shopify Storefront API");
+    }
+    
     const productsData = responseData.data.products.edges;
 
     const products = productsData.map(({ node }: any) => ({

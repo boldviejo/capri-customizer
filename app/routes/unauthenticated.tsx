@@ -1,9 +1,9 @@
-import { json } from "@remix-run/node";
+import { json, type LinksFunction } from "@remix-run/node";
 import { Outlet } from "@remix-run/react";
-import "@shopify/polaris/build/esm/styles.css";
+import polarisStyles from "@shopify/polaris/build/esm/styles.css";
 
-export const links = () => [
-  { rel: "stylesheet", href: "@shopify/polaris/build/esm/styles.css" }
+export const links: LinksFunction = () => [
+  { rel: "stylesheet", href: polarisStyles }
 ];
 
 export const loader = async () => {

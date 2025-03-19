@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { json, type LoaderFunctionArgs } from "@remix-run/node";
+import { json, type LoaderFunctionArgs, type LinksFunction } from "@remix-run/node";
 import { useLoaderData, Link } from "@remix-run/react";
 import {
   Text,
@@ -13,10 +13,10 @@ import {
 } from "@shopify/polaris";
 
 import { authenticate } from "../shopify.server";
-import "@shopify/polaris/build/esm/styles.css";
+import polarisStyles from "@shopify/polaris/build/esm/styles.css";
 
-export const links = () => [
-  { rel: "stylesheet", href: "@shopify/polaris/build/esm/styles.css" }
+export const links: LinksFunction = () => [
+  { rel: "stylesheet", href: polarisStyles },
 ];
 
 interface Product {

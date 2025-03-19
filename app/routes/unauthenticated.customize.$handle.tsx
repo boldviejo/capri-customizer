@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { json, redirect, type LoaderFunctionArgs, type ActionFunctionArgs } from "@remix-run/node";
+import { json, redirect, type LoaderFunctionArgs, type ActionFunctionArgs, type LinksFunction } from "@remix-run/node";
 import { useLoaderData, useSubmit, Form } from "@remix-run/react";
 import {
   Text,
@@ -12,10 +12,14 @@ import {
   Select,
   InlineStack,
 } from "@shopify/polaris";
-import "@shopify/polaris/build/esm/styles.css";
+import polarisStyles from "@shopify/polaris/build/esm/styles.css";
 
 // Define the shop domain
 const SHOP_DOMAIN = "capri-dev-store.myshopify.com";
+
+export const links: LinksFunction = () => [
+  { rel: "stylesheet", href: polarisStyles },
+];
 
 // Define types for our data
 interface ProductVariant {
@@ -43,15 +47,54 @@ interface LoaderData {
 }
 
 export const loader = async ({ params }: LoaderFunctionArgs) => {
-  try {
-    const { handle } = params;
+  const { handle } = params;
 
-    if (!handle) {
+  if (!handle) {
+    return json({ 
+      error: "Product handle is required" 
+    }, { status: 400 });
+  }
+
+  // Check if Storefront API token is available
+  if (!process.env.SHOPIFY_STOREFRONT_API_TOKEN) {
+    console.warn("SHOPIFY_STOREFRONT_API_TOKEN is not set, returning mock data");
+    
+    // Check if the handle matches one of our mock products
+    if (handle === "sample-product-1" || handle === "sample-product-2") {
+      const productNumber = handle === "sample-product-1" ? "1" : "2";
+      
+      // Return mock data when the token is not available
+      return json({
+        product: {
+          id: `gid://shopify/Product/${productNumber}`,
+          title: `Sample Product ${productNumber}`,
+          handle: handle,
+          description: `<p>This is a detailed description for Sample Product ${productNumber}. This appears when the Storefront API token is not configured.</p>`,
+          variants: [
+            {
+              id: `gid://shopify/ProductVariant/${productNumber}1`,
+              title: "Default",
+              price: "19.99",
+              availableForSale: true
+            }
+          ],
+          images: [
+            {
+              url: "https://via.placeholder.com/800x600",
+              altText: `Sample product ${productNumber} image`
+            }
+          ]
+        },
+        error: null
+      });
+    } else {
       return json({ 
-        error: "Product handle is required" 
-      }, { status: 400 });
+        error: "Product not found" 
+      }, { status: 404 });
     }
+  }
 
+  try {
     // Get the product by handle using Storefront API
     const response = await fetch(
       `https://${SHOP_DOMAIN}/api/2024-01/graphql.json`,
