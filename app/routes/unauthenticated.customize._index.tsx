@@ -10,9 +10,10 @@ import {
   Button,
   Spinner,
 } from "@shopify/polaris";
+import { queryStorefrontApi } from "~/shopify.server";
 
 export const links: LinksFunction = () => [
-  { rel: "stylesheet", href: "https://unpkg.com/@shopify/polaris@11.0.0/build/esm/styles.css" },
+  { rel: "stylesheet", href: "https://unpkg.com/@shopify/polaris@12.0.0/build/esm/styles.css" },
 ];
 
 // Define the shop domain
@@ -56,21 +57,7 @@ export const loader = async () => {
       }
     `;
 
-    const response = await fetch(
-      `https://${SHOP_DOMAIN}/api/2024-01/graphql.json`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Shopify-Storefront-Access-Token": process.env.SHOPIFY_STOREFRONT_API_TOKEN || "",
-        },
-        body: JSON.stringify({
-          query,
-        }),
-      }
-    );
-
-    const responseData = await response.json();
+    const responseData = await queryStorefrontApi(query);
     
     // Check if we have valid data
     if (!responseData.data || !responseData.data.products) {

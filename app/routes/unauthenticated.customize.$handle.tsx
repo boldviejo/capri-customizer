@@ -12,9 +12,10 @@ import {
   Select,
   InlineStack,
 } from "@shopify/polaris";
+import { queryStorefrontApi, getShopifyDomain } from "~/shopify.server";
 
 export const links: LinksFunction = () => [
-  { rel: "stylesheet", href: "https://unpkg.com/@shopify/polaris@11.0.0/build/esm/styles.css" },
+  { rel: "stylesheet", href: "https://unpkg.com/@shopify/polaris@12.0.0/build/esm/styles.css" },
 ];
 
 // Define the shop domain
@@ -95,54 +96,40 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
 
   try {
     // Get the product by handle using Storefront API
-    const response = await fetch(
-      `https://${SHOP_DOMAIN}/api/2024-01/graphql.json`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Shopify-Storefront-Access-Token": process.env.SHOPIFY_STOREFRONT_API_TOKEN || "",
-        },
-        body: JSON.stringify({
-          query: `
-            query getProduct($handle: String!) {
-              productByHandle(handle: $handle) {
+    const query = `
+      query getProduct($handle: String!) {
+        productByHandle(handle: $handle) {
+          id
+          title
+          handle
+          descriptionHtml
+          variants(first: 100) {
+            edges {
+              node {
                 id
                 title
-                handle
-                descriptionHtml
-                variants(first: 100) {
-                  edges {
-                    node {
-                      id
-                      title
-                      price {
-                        amount
-                        currencyCode
-                      }
-                      availableForSale
-                    }
-                  }
+                price {
+                  amount
+                  currencyCode
                 }
-                images(first: 1) {
-                  edges {
-                    node {
-                      url
-                      altText
-                    }
-                  }
-                }
+                availableForSale
               }
             }
-          `,
-          variables: {
-            handle,
-          },
-        }),
+          }
+          images(first: 1) {
+            edges {
+              node {
+                url
+                altText
+              }
+            }
+          }
+        }
       }
-    );
-
-    const responseData = await response.json();
+    `;
+    
+    const variables = { handle };
+    const responseData = await queryStorefrontApi(query, variables);
     const productData = responseData.data.productByHandle;
 
     if (!productData) {
@@ -281,23 +268,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       };
     }
 
-    // Create cart and add item using Storefront API
-    const response = await fetch(
-      `https://${SHOP_DOMAIN}/api/2024-01/graphql.json`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Shopify-Storefront-Access-Token": process.env.SHOPIFY_STOREFRONT_API_TOKEN || "",
-        },
-        body: JSON.stringify({
-          query,
-          variables,
-        }),
-      }
-    );
-
-    const responseData = await response.json();
+    const responseData = await queryStorefrontApi(query, variables);
     
     // Determine which response structure we get based on the query used
     const operationName = cartId ? 'cartLinesAdd' : 'cartCreate';
