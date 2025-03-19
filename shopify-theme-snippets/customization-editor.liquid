@@ -1,0 +1,88 @@
+{% comment %}
+  customization-editor.liquid
+  
+  Add this snippet to your cart-item.liquid or cart.liquid file to enable
+  editing of customized products.
+  
+  Usage: 
+  1. Include this snippet in your cart template where line items are displayed
+  2. Add it inside the loop that iterates through cart items
+  
+  Example:
+  {% for item in cart.items %}
+    <!-- Your existing cart item code -->
+    {% if item.properties['Custom Text'] %}
+      {% render 'customization-editor', item: item %}
+    {% endif %}
+  {% endfor %}
+{% endcomment %}
+
+<div class="customization-editor">
+  <button 
+    type="button" 
+    class="customization-edit-button"
+    data-item-key="{{ item.key }}"
+    data-variant-id="{{ item.variant_id }}"
+    data-product-handle="{{ item.product.handle }}"
+    data-custom-text="{{ item.properties['Custom Text'] }}"
+    data-font-family="{{ item.properties['Font'] }}"
+    data-font-size="{{ item.properties['Font Size'] }}"
+    data-text-color="{{ item.properties['Text Color'] }}"
+    data-position="{{ item.properties['Position'] }}"
+    data-pet-photo-url="{{ item.properties['Pet Photo URL'] }}"
+    onclick="handleEditCustomization(this)"
+    style="
+      display: inline-flex;
+      align-items: center;
+      background-color: transparent;
+      border: 1px solid #bababa;
+      color: #323232;
+      border-radius: 4px;
+      font-size: 14px;
+      padding: 6px 10px;
+      margin-top: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    "
+    onmouseover="this.style.backgroundColor='#f6f6f6';"
+    onmouseout="this.style.backgroundColor='transparent';"
+  >
+    <svg style="margin-right: 6px; width: 14px; height: 14px;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+    </svg>
+    Edit
+  </button>
+</div>
+
+<script>
+  function handleEditCustomization(button) {
+    // Get data attributes from the button
+    const itemKey = button.getAttribute('data-item-key');
+    const variantId = button.getAttribute('data-variant-id');
+    const productHandle = button.getAttribute('data-product-handle');
+    const customText = button.getAttribute('data-custom-text');
+    const fontFamily = button.getAttribute('data-font-family');
+    const fontSize = button.getAttribute('data-font-size');
+    const textColor = button.getAttribute('data-text-color');
+    const position = button.getAttribute('data-position');
+    const petPhotoUrl = button.getAttribute('data-pet-photo-url');
+    
+    // Construct the URL to the edit-redirect-bridge
+    const url = new URL(window.location.origin + '/pages/edit-redirect-bridge');
+    
+    // Add parameters to the URL
+    url.searchParams.append('item_key', itemKey);
+    url.searchParams.append('variant_id', variantId);
+    url.searchParams.append('product_handle', productHandle);
+    if (customText) url.searchParams.append('custom_text', customText);
+    if (fontFamily) url.searchParams.append('font_family', fontFamily);
+    if (fontSize) url.searchParams.append('font_size', fontSize);
+    if (textColor) url.searchParams.append('text_color', textColor);
+    if (position) url.searchParams.append('position', position);
+    if (petPhotoUrl) url.searchParams.append('pet_photo_url', petPhotoUrl);
+    
+    // Navigate to the URL
+    window.location.href = url.toString();
+  }
+</script> 

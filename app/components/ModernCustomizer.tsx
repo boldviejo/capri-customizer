@@ -18,27 +18,44 @@ interface CustomizerProps {
     }[];
   };
   onSubmit: (formData: FormData) => void;
+  initialValues?: {
+    customText?: string;
+    fontFamily?: string;
+    fontSize?: number;
+    textColor?: string;
+    textPosition?: string;
+    selectedVariantId?: string;
+    imagePreview?: string;
+  };
+  submitButtonText?: string;
 }
 
-export default function ModernCustomizer({ product, onSubmit }: CustomizerProps) {
-  const [customText, setCustomText] = useState("");
-  const [selectedVariantId, setSelectedVariantId] = useState("");
-  const [fontFamily, setFontFamily] = useState("Arial");
-  const [fontSize, setFontSize] = useState(16);
-  const [textColor, setTextColor] = useState("#000000");
-  const [textPosition, setTextPosition] = useState("center");
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+export default function ModernCustomizer({ 
+  product, 
+  onSubmit, 
+  initialValues = {}, 
+  submitButtonText = "Add to Cart" 
+}: CustomizerProps) {
+  const [customText, setCustomText] = useState(initialValues.customText || "");
+  const [selectedVariantId, setSelectedVariantId] = useState(initialValues.selectedVariantId || "");
+  const [fontFamily, setFontFamily] = useState(initialValues.fontFamily || "Arial");
+  const [fontSize, setFontSize] = useState(initialValues.fontSize || 16);
+  const [textColor, setTextColor] = useState(initialValues.textColor || "#000000");
+  const [textPosition, setTextPosition] = useState(initialValues.textPosition || "center");
+  const [imagePreview, setImagePreview] = useState<string | null>(initialValues.imagePreview || null);
 
   useEffect(() => {
-    if (product && product.variants.length > 0) {
+    // Only set default variant if one wasn't provided in initialValues
+    if (!initialValues.selectedVariantId && product && product.variants.length > 0) {
       const availableVariant = product.variants.find(v => v.availableForSale);
       setSelectedVariantId(availableVariant?.id || product.variants[0].id);
     }
     
-    if (product && product.images.length > 0) {
+    // Only set default image if one wasn't provided in initialValues
+    if (!initialValues.imagePreview && product && product.images.length > 0) {
       setImagePreview(product.images[0].url);
     }
-  }, [product]);
+  }, [product, initialValues]);
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -218,7 +235,7 @@ export default function ModernCustomizer({ product, onSubmit }: CustomizerProps)
               type="submit" 
               className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 mt-4"
             >
-              Add to Cart
+              {submitButtonText}
             </button>
           </form>
         </div>

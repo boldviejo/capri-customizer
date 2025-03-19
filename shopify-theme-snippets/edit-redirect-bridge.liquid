@@ -1,0 +1,116 @@
+{% comment %}
+  edit-redirect-bridge.liquid - Bridge template for redirecting from Shopify cart to customizer app's edit page
+  
+  To use:
+  1. Create a page in your Shopify admin with the handle "edit-redirect-bridge"
+  2. Select this template for the page
+  
+  This template receives parameters from the Edit button in the cart and redirects to the customizer app's edit page.
+{% endcomment %}
+
+{% layout none %}
+
+<!DOCTYPE html>
+<html lang="{{ shop.locale }}">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Redirecting to Customizer... - {{ shop.name }}</title>
+  
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, San Francisco, Segoe UI, Roboto, Helvetica Neue, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #fff;
+      color: #333;
+      line-height: 1.5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .container {
+      text-align: center;
+      max-width: 400px;
+      padding: 20px;
+    }
+    .spinner {
+      display: inline-block;
+      width: 50px;
+      height: 50px;
+      border: 3px solid rgba(0, 0, 0, 0.1);
+      border-radius: 50%;
+      border-top-color: #000;
+      animation: spin 1s ease-in-out infinite;
+      margin-bottom: 20px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .message {
+      margin-top: 20px;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="spinner"></div>
+    <div class="message">
+      Redirecting to customizer...
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      // Function to get URL parameters
+      function getParam(name) {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get(name);
+      }
+      
+      // Get parameters from URL
+      const productHandle = getParam('product_handle');
+      const variantId = getParam('variant_id');
+      const customText = getParam('custom_text');
+      const fontFamily = getParam('font_family');
+      const fontSize = getParam('font_size');
+      const textColor = getParam('text_color');
+      const position = getParam('position');
+      const petPhotoUrl = getParam('pet_photo_url');
+      const itemKey = getParam('item_key');
+      
+      // Validate required parameters
+      if (!productHandle) {
+        console.error('Missing product handle');
+        alert('Error: Missing product information. Please try again.');
+        window.location.href = '/cart';
+        return;
+      }
+
+      // Build the redirect URL to the edit page
+      const appDomain = window.location.origin;
+      const editUrl = new URL(`${appDomain}/edit/${productHandle}`);
+      
+      // Add parameters to the URL
+      if (variantId) editUrl.searchParams.append('variant_id', variantId);
+      if (customText) editUrl.searchParams.append('custom_text', customText);
+      if (fontFamily) editUrl.searchParams.append('font_family', fontFamily);
+      if (fontSize) editUrl.searchParams.append('font_size', fontSize);
+      if (textColor) editUrl.searchParams.append('text_color', textColor);
+      if (position) editUrl.searchParams.append('position', position);
+      if (petPhotoUrl) editUrl.searchParams.append('pet_photo_url', petPhotoUrl);
+      if (itemKey) editUrl.searchParams.append('item_key', itemKey);
+      
+      // Log the URL for debugging
+      console.log('Redirecting to edit page:', editUrl.toString());
+      
+      // Redirect to the edit page
+      window.location.href = editUrl.toString();
+    })();
+  </script>
+</body>
+</html> 
