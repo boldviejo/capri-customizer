@@ -18,9 +18,6 @@ export const links: LinksFunction = () => [
   { rel: "stylesheet", href: "https://unpkg.com/@shopify/polaris@12.0.0/build/esm/styles.css" },
 ];
 
-// Define the shop domain
-const SHOP_DOMAIN = "capri-dev-store.myshopify.com";
-
 // Define types for our data
 interface ProductVariant {
   id: string;
