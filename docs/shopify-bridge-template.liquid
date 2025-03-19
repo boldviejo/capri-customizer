@@ -93,6 +93,7 @@
       const fontFamily = getParam('font_family');
       const fontSize = getParam('font_size');
       const textColor = getParam('text_color');
+      const petPhotoUrl = getParam('pet_photo_url');
       
       // Function to send message to parent if in iframe
       function postMessageToParent(data) {
@@ -122,6 +123,7 @@
         if (fontFamily) properties['Font'] = fontFamily;
         if (fontSize) properties['Font Size'] = fontSize;
         if (textColor) properties['Text Color'] = textColor;
+        if (petPhotoUrl) properties['Pet Photo URL'] = petPhotoUrl;
         
         // Build the cart data
         const cartData = {

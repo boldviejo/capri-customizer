@@ -13,6 +13,7 @@ import {
   InlineStack,
 } from "@shopify/polaris";
 import { queryStorefrontApi, getShopifyDomain } from "~/shopify.server";
+import CloudinaryUploader from "~/components/CloudinaryUploader";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: "https://unpkg.com/@shopify/polaris@12.0.0/build/esm/styles.css" },
@@ -196,6 +197,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const color = String(formData.get("color") || "");
   const variantId = String(formData.get("variantId") || "");
   const returnUrl = String(formData.get("returnUrl") || ""); // Optional return URL
+  const petPhotoUrl = String(formData.get("petPhotoUrl") || ""); // Get the pet photo URL
   
   if (!text || !fontFamily || !fontSize || !color || !variantId) {
     return json({
@@ -227,6 +229,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         fontFamily,
         fontSize: fontSize.toString(),
         color,
+        petPhotoUrl, // Include pet photo URL
         shopifyDomain,
         // Send the return URL if provided, otherwise use the current app URL
         returnUrl: returnUrl || appOrigin
@@ -255,6 +258,7 @@ export default function ProductCustomizer() {
   const [fontFamily, setFontFamily] = useState('Arial');
   const [fontSize, setFontSize] = useState<number>(16);
   const [color, setColor] = useState('#000000');
+  const [petPhotoUrl, setPetPhotoUrl] = useState('');
   
   // Cart state
   const [cartId, setCartId] = useState("");
@@ -332,6 +336,7 @@ export default function ProductCustomizer() {
           `font_family=${encodeURIComponent(data.fontFamily || '')}&` +
           `font_size=${encodeURIComponent(data.fontSize || '')}&` +
           `text_color=${encodeURIComponent(data.color || '')}&` +
+          `pet_photo_url=${encodeURIComponent(data.petPhotoUrl || '')}&` +
           `return_url=${encodeURIComponent(returnUrl)}`;
         
         console.log("Redirecting to bridge page:", bridgeUrl);
@@ -378,6 +383,11 @@ export default function ProductCustomizer() {
       return;
     }
     
+    if (!petPhotoUrl) {
+      setErrorMessage("Please upload a pet photo");
+      return;
+    }
+    
     const formData = new FormData();
     formData.append("text", customText);
     formData.append("fontFamily", fontFamily);
@@ -385,13 +395,9 @@ export default function ProductCustomizer() {
     formData.append("color", color);
     formData.append("variantId", selectedVariantId);
     formData.append("returnUrl", window.location.href);
+    formData.append("petPhotoUrl", petPhotoUrl);
     
-    try {
-      const response = await submit(formData, { method: "post", replace: true });
-    } catch (error) {
-      console.error("Error submitting form:", error);
-      setErrorMessage("An error occurred while submitting the form. Please try again.");
-    }
+    submit(formData, { method: "post" });
   };
   
   const variantOptions = product.variants.map((variant: ProductVariant) => ({
@@ -486,6 +492,15 @@ export default function ProductCustomizer() {
                         
                         <Divider />
                         
+                        <CloudinaryUploader
+                          cloudName={process.env.CLOUDINARY_CLOUD_NAME || "your-cloud-name"}
+                          uploadPreset="Capri Customizer"
+                          onImageUploaded={(url) => setPetPhotoUrl(url)}
+                          onUploadError={(error) => console.error('Upload error:', error)}
+                        />
+                        
+                        <Divider />
+                        
                         <TextField
                           label="Your Custom Text"
                           value={customText}
@@ -544,10 +559,21 @@ export default function ProductCustomizer() {
                               alignItems: 'center',
                               justifyContent: 'center',
                               marginTop: '8px',
-                              backgroundColor: '#f9f9f9'
+                              backgroundColor: '#f9f9f9',
+                              backgroundImage: petPhotoUrl ? `url(${petPhotoUrl})` : 'none',
+                              backgroundSize: petPhotoUrl ? 'cover' : 'auto',
+                              backgroundPosition: 'center',
+                              position: 'relative'
                             }}
                           >
-                            {customText || "Your text will appear here"}
+                            <div style={{
+                              backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                              padding: '10px',
+                              borderRadius: '4px',
+                              maxWidth: '80%'
+                            }}>
+                              {customText || "Your text will appear here"}
+                            </div>
                           </div>
                         </Box>
                         
@@ -555,7 +581,7 @@ export default function ProductCustomizer() {
                           <Button 
                             submit
                             variant="primary" 
-                            disabled={!customText || !selectedVariantId}
+                            disabled={!customText || !selectedVariantId || !petPhotoUrl}
                             size="large"
                             fullWidth
                           >
