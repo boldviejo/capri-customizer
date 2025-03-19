@@ -2,8 +2,6 @@ import { useState, useCallback } from "react";
 import { json, type ActionFunctionArgs, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useSubmit, useNavigation, useActionData } from "@remix-run/react";
 import {
-  Page,
-  Layout,
   Text,
   Card,
   Button,
@@ -12,16 +10,11 @@ import {
   Divider,
   TextField,
   Select,
-  InlineStack,
   Banner,
-  Frame,
-  FooterHelp,
-  Link as PolarisLink,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { useEffect } from "react";
-import { PrismaClient } from "@prisma/client";
 
 // Define types for our data
 interface ProductVariant {
@@ -46,24 +39,31 @@ type ActionData =
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
   
-  // Get a sample product to demonstrate the customizer
-  const products = await admin.graphql(`
+  // Get product data from the URL query parameters
+  const url = new URL(request.url);
+  const productId = url.searchParams.get("productId");
+  
+  if (!productId) {
+    return json({
+      product: null,
+      variants: []
+    });
+  }
+  
+  // Get the specific product
+  const productQuery = await admin.graphql(`
     query {
-      products(first: 10) {
-        edges {
-          node {
-            id
-            title
-            handle
-            variants(first: 10) {
-              edges {
-                node {
-                  id
-                  title
-                  price
-                  availableForSale
-                }
-              }
+      product(id: "${productId}") {
+        id
+        title
+        handle
+        variants(first: 100) {
+          edges {
+            node {
+              id
+              title
+              price
+              availableForSale
             }
           }
         }
@@ -71,20 +71,31 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
   `);
 
-  const response = await products.json();
+  const response = await productQuery.json();
+  const productData = response.data.product;
   
-  return json({
-    products: response.data.products.edges.map(({ node }: any) => ({
+  if (!productData) {
+    return json({
+      product: null,
+      variants: []
+    });
+  }
+  
+  const product = {
+    id: productData.id,
+    title: productData.title,
+    handle: productData.handle,
+    variants: productData.variants.edges.map(({ node }: any) => ({
       id: node.id,
       title: node.title,
-      handle: node.handle,
-      variants: node.variants.edges.map(({ node }: any) => ({
-        id: node.id,
-        title: node.title,
-        price: node.price,
-        availableForSale: node.availableForSale,
-      }))
-    })) as Product[]
+      price: node.price,
+      availableForSale: node.availableForSale,
+    }))
+  };
+  
+  return json({
+    product,
+    variants: product.variants
   });
 };
 
@@ -101,7 +112,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   
   try {
     // Save the customization data to our database
-    // Use type assertion to bypass the TypeScript error
     const prismaAny = prisma as any;
     const customization = await prismaAny.Customization.create({
       data: {
@@ -161,23 +171,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           cart {
             id
             checkoutUrl
-            lines(first: 10) {
-              edges {
-                node {
-                  id
-                  merchandise {
-                    ... on ProductVariant {
-                      id
-                      title
-                    }
-                  }
-                  attributes {
-                    key
-                    value
-                  }
-                }
-              }
-            }
           }
           userErrors {
             field
@@ -214,16 +207,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function ProductCustomizer() {
-  const { products } = useLoaderData<typeof loader>();
+  const { product, variants } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>() as ActionData | undefined;
   const submit = useSubmit();
   const navigation = useNavigation();
   const isLoading = navigation.state === "submitting";
   
   const [customText, setCustomText] = useState("");
-  const [selectedProductId, setSelectedProductId] = useState("");
-  const [selectedVariantId, setSelectedVariantId] = useState("");
-  const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [selectedVariantId, setSelectedVariantId] = useState(variants.length > 0 ? variants[0].id : "");
   const [fontFamily, setFontFamily] = useState("Arial");
   const [fontSize, setFontSize] = useState(16);
   const [textColor, setTextColor] = useState("#000000");
@@ -246,37 +237,21 @@ export default function ProductCustomizer() {
     }
   }, [actionData]);
   
-  // Update variants when a product is selected
-  useEffect(() => {
-    if (selectedProductId) {
-      const product = products.find((p: Product) => p.id === selectedProductId);
-      if (product) {
-        setVariants(product.variants);
-        if (product.variants.length > 0) {
-          setSelectedVariantId(product.variants[0].id);
-        }
-      }
-    }
-  }, [selectedProductId, products]);
-  
   const handleSubmit = useCallback(() => {
+    if (!product) return;
+    
     submit(
       {
         text: customText,
         fontFamily,
         fontSize: fontSize.toString(),
         color: textColor,
-        productId: selectedProductId,
+        productId: product.id,
         variantId: selectedVariantId,
       },
       { method: "post" }
     );
-  }, [customText, fontFamily, fontSize, textColor, selectedProductId, selectedVariantId, submit]);
-  
-  const productOptions = products.map((product: Product) => ({
-    label: product.title,
-    value: product.id,
-  }));
+  }, [customText, fontFamily, fontSize, textColor, product, selectedVariantId, submit]);
   
   const variantOptions = variants.map((variant: ProductVariant) => ({
     label: variant.title,
@@ -307,147 +282,125 @@ export default function ProductCustomizer() {
     { label: "Silver", value: "#C0C0C0" },
   ];
   
+  if (!product) {
+    return <Card>
+      <BlockStack gap="400">
+        <Box padding="400">
+          <Text as="p">Please specify a product ID in the URL parameters</Text>
+        </Box>
+      </BlockStack>
+    </Card>;
+  }
+  
   return (
-    <Page title="Product Customizer">
-      <Frame>
-        {success && (
-          <Banner
-            title="Customization saved"
-            tone="success"
-            onDismiss={() => setSuccess(false)}
-          >
-            <p>The customization has been saved. You can now proceed to checkout.</p>
-            {actionData?.success && 'checkoutUrl' in actionData && (
-              <div style={{ marginTop: '10px' }}>
-                <Button
-                  url={actionData.checkoutUrl}
-                  target="_blank"
-                  variant="primary"
-                >
-                  Proceed to Checkout
-                </Button>
-              </div>
+    <Card>
+      {success && (
+        <Banner
+          title="Customization saved"
+          tone="success"
+          onDismiss={() => setSuccess(false)}
+        >
+          <p>Your customization has been added to cart.</p>
+          {actionData?.success && 'checkoutUrl' in actionData && (
+            <div style={{ marginTop: '10px' }}>
+              <Button
+                url={actionData.checkoutUrl}
+                target="_blank"
+                variant="primary"
+              >
+                Proceed to Checkout
+              </Button>
+            </div>
+          )}
+        </Banner>
+      )}
+      
+      {error && (
+        <Banner
+          title="Error"
+          tone="critical"
+          onDismiss={() => setError(false)}
+        >
+          <p>{actionData && !actionData.success && 'message' in actionData ? actionData.message : "An error occurred while saving your customization"}</p>
+        </Banner>
+      )}
+      
+      <BlockStack gap="400">
+        <Box padding="400">
+          <BlockStack gap="400">
+            <Text as="h2" variant="headingLg">Customize Your {product.title}</Text>
+            
+            {variants.length > 1 && (
+              <Select
+                label="Select variant"
+                options={variantOptions}
+                onChange={setSelectedVariantId}
+                value={selectedVariantId}
+              />
             )}
-          </Banner>
-        )}
-        
-        {error && (
-          <Banner
-            title="Error"
-            tone="critical"
-            onDismiss={() => setError(false)}
-          >
-            <p>{actionData && !actionData.success && 'message' in actionData ? actionData.message : "An error occurred while saving your customization"}</p>
-          </Banner>
-        )}
-        
-        <Layout>
-          <Layout.Section>
-            <Card>
-              <BlockStack gap="500">
-                <Box padding="400">
-                  <BlockStack gap="400">
-                    <Text as="h2" variant="headingLg">Create Your Custom Product</Text>
-                    
-                    <Select
-                      label="Select a product"
-                      options={productOptions}
-                      onChange={setSelectedProductId}
-                      value={selectedProductId}
-                    />
-                    
-                    <Select
-                      label="Select a variant"
-                      options={variantOptions}
-                      onChange={setSelectedVariantId}
-                      value={selectedVariantId}
-                      disabled={variants.length === 0}
-                      helpText={variants.length === 0 ? "Select a product first to see available variants" : ""}
-                    />
-                    
-                    <Divider />
-                    
-                    <TextField
-                      label="Custom Text"
-                      value={customText}
-                      onChange={setCustomText}
-                      autoComplete="off"
-                      placeholder="Enter text for your customization"
-                    />
-                    
-                    <Select
-                      label="Font Family"
-                      options={fontOptions}
-                      onChange={setFontFamily}
-                      value={fontFamily}
-                    />
-                    
-                    <Select
-                      label="Font Size"
-                      options={fontSizeOptions}
-                      onChange={(value) => setFontSize(parseInt(value, 10))}
-                      value={fontSize.toString()}
-                    />
-                    
-                    <Select
-                      label="Text Color"
-                      options={colorOptions}
-                      onChange={setTextColor}
-                      value={textColor}
-                    />
-                    
-                    <Box paddingBlockStart="400">
-                      <Button 
-                        variant="primary" 
-                        onClick={handleSubmit}
-                        loading={isLoading}
-                        disabled={!customText || !selectedProductId || !selectedVariantId}
-                        size="large"
-                        fullWidth
-                      >
-                        Save & Add to Cart
-                      </Button>
-                    </Box>
-                  </BlockStack>
-                </Box>
-              </BlockStack>
-            </Card>
-          </Layout.Section>
-          
-          <Layout.Section variant="oneThird">
-            <Card>
-              <BlockStack gap="400">
-                <Box padding="400">
-                  <BlockStack gap="200">
-                    <Text as="h2" variant="headingMd">Preview</Text>
-                    <Divider />
-                    <div 
-                      style={{ 
-                        fontFamily, 
-                        fontSize: `${fontSize}px`, 
-                        color: textColor,
-                        padding: '20px',
-                        border: '1px dashed #ccc',
-                        borderRadius: '4px',
-                        minHeight: '100px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      {customText || "Your text will appear here"}
-                    </div>
-                  </BlockStack>
-                </Box>
-              </BlockStack>
-            </Card>
-          </Layout.Section>
-        </Layout>
-        
-        <FooterHelp>
-          This customization will be saved and added to your cart. You can then proceed to checkout.
-        </FooterHelp>
-      </Frame>
-    </Page>
+            
+            <Divider />
+            
+            <TextField
+              label="Your Custom Text"
+              value={customText}
+              onChange={setCustomText}
+              autoComplete="off"
+              placeholder="Enter text for your customization"
+            />
+            
+            <Select
+              label="Font Style"
+              options={fontOptions}
+              onChange={setFontFamily}
+              value={fontFamily}
+            />
+            
+            <Select
+              label="Font Size"
+              options={fontSizeOptions}
+              onChange={(value) => setFontSize(parseInt(value, 10))}
+              value={fontSize.toString()}
+            />
+            
+            <Select
+              label="Text Color"
+              options={colorOptions}
+              onChange={setTextColor}
+              value={textColor}
+            />
+            
+            <div 
+              style={{ 
+                fontFamily, 
+                fontSize: `${fontSize}px`, 
+                color: textColor,
+                padding: '20px',
+                border: '1px dashed #ccc',
+                borderRadius: '4px',
+                minHeight: '80px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '16px'
+              }}
+            >
+              {customText || "Your text will appear here"}
+            </div>
+            
+            <Button 
+              variant="primary" 
+              onClick={handleSubmit}
+              loading={isLoading}
+              disabled={!customText || !selectedVariantId}
+              size="large"
+              fullWidth
+            >
+              Add Customized Item to Cart
+            </Button>
+          </BlockStack>
+        </Box>
+      </BlockStack>
+    </Card>
   );
 } 
