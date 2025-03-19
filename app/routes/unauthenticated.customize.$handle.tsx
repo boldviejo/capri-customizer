@@ -12,6 +12,7 @@ import {
   Select,
   InlineStack,
 } from "@shopify/polaris";
+import "@shopify/polaris/build/esm/styles.css";
 
 // Define the shop domain
 const SHOP_DOMAIN = "capri-dev-store.myshopify.com";

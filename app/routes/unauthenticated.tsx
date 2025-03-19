@@ -1,8 +1,10 @@
 import { json } from "@remix-run/node";
 import { Outlet } from "@remix-run/react";
-import polarisStyles from "@shopify/polaris/build/esm/styles.css";
+import "@shopify/polaris/build/esm/styles.css";
 
-export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
+export const links = () => [
+  { rel: "stylesheet", href: "@shopify/polaris/build/esm/styles.css" }
+];
 
 export const loader = async () => {
   return json({

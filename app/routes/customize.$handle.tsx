@@ -15,10 +15,10 @@ import {
 } from "@shopify/polaris";
 
 import { authenticate } from "../shopify.server";
-import polarisStyles from "@shopify/polaris/build/esm/styles.css";
+import "@shopify/polaris/build/esm/styles.css";
 
 export const links = () => [
-  { rel: "stylesheet", href: polarisStyles }
+  { rel: "stylesheet", href: "@shopify/polaris/build/esm/styles.css" }
 ];
 
 // Define types for our data
