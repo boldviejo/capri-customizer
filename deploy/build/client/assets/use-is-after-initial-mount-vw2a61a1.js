@@ -1,0 +1,1 @@
+import{r as t}from"./components-DFXdd6rU.js";const o={selector:"[data-polaris-scrollable]"},n={props:{"data-polaris-unstyled":!0}},r={selector:"[data-polaris-top-bar]"},l=t.createContext(void 0),i=t.createContext(void 0);function c(){const[e,s]=t.useState(!1);return t.useEffect(()=>{s(!0)},[]),e}export{l as I,i as L,n as a,r as d,o as s,c as u};
