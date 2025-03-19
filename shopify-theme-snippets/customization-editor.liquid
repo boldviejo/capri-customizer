@@ -68,13 +68,13 @@
     const position = button.getAttribute('data-position');
     const petPhotoUrl = button.getAttribute('data-pet-photo-url');
     
-    // Construct the URL to the edit-redirect-bridge
-    const url = new URL(window.location.origin + '/pages/edit-redirect-bridge');
+    // Use the Cloud Run app URL instead of the Shopify store domain
+    const customizerAppUrl = "https://capri-customizer-86025189386.us-central1.run.app/edit/" + productHandle;
     
     // Add parameters to the URL
+    const url = new URL(customizerAppUrl);
     url.searchParams.append('item_key', itemKey);
     url.searchParams.append('variant_id', variantId);
-    url.searchParams.append('product_handle', productHandle);
     if (customText) url.searchParams.append('custom_text', customText);
     if (fontFamily) url.searchParams.append('font_family', fontFamily);
     if (fontSize) url.searchParams.append('font_size', fontSize);

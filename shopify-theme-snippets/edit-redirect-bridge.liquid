@@ -91,8 +91,8 @@
         return;
       }
 
-      // Build the redirect URL to the edit page
-      const appDomain = window.location.origin;
+      // Build the redirect URL to the edit page on the Cloud Run app
+      const appDomain = "https://capri-customizer-86025189386.us-central1.run.app";
       const editUrl = new URL(`${appDomain}/edit/${productHandle}`);
       
       // Add parameters to the URL
