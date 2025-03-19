@@ -293,9 +293,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       });
     }
     
-    // After adding the item, redirect to the cart/checkout page
+    // After adding the item, redirect to the Shopify cart page
+    // Convert checkout URL to cart URL by replacing /checkouts/ with /cart/
     if (cartDetails.checkoutUrl) {
-      return redirect(cartDetails.checkoutUrl);
+      // Extract the domain from the checkout URL
+      const shopifyDomain = getShopifyDomain();
+      // Create a cart URL from the domain
+      const cartUrl = `https://${shopifyDomain}/cart`;
+      return redirect(cartUrl);
     }
     
     // Return cart details if not redirecting
