@@ -1,12 +1,4 @@
 import { useState, useEffect } from "react";
-import {
-  Button,
-  Card,
-  Divider,
-  Input,
-  Select,
-  Image
-} from "@heroui/react";
 
 interface CustomizerProps {
   product: {
@@ -103,12 +95,12 @@ export default function ModernCustomizer({ product, onSubmit }: CustomizerProps)
   };
 
   return (
-    <Card className="w-full mx-auto max-w-6xl">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4">
+    <div className="bg-white rounded-lg shadow-lg w-full mx-auto max-w-6xl overflow-hidden">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
         <div>
-          <div className="relative h-96 bg-gray-100 rounded-md">
+          <div className="relative h-96 bg-gray-100 rounded-md flex items-center justify-center">
             {imagePreview && (
-              <Image 
+              <img 
                 src={imagePreview} 
                 alt={product.title} 
                 className="object-contain h-full w-full" 
@@ -127,28 +119,30 @@ export default function ModernCustomizer({ product, onSubmit }: CustomizerProps)
         
         <div>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <h2 className="text-2xl font-bold">{product.title}</h2>
+            <h2 className="text-2xl font-bold text-gray-800">{product.title}</h2>
             
-            <div className="bg-green-100 text-green-800 px-2 py-1 rounded text-sm inline-block w-fit">
+            <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm inline-block w-fit font-medium">
               ${product.variants.find(v => v.id === selectedVariantId)?.price || "N/A"}
             </div>
             
-            <Divider className="my-2" />
+            <hr className="my-4 border-gray-200" />
             
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div className="space-y-2">
-                <label className="block text-sm font-medium">Your Custom Text</label>
-                <Input
+                <label className="block text-sm font-medium text-gray-700">Your Custom Text</label>
+                <input
+                  type="text"
                   value={customText}
                   onChange={(e) => setCustomText(e.target.value)}
                   placeholder="Enter your text here"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                 />
               </div>
               
               <div className="space-y-2">
-                <label className="block text-sm font-medium">Text Position</label>
+                <label className="block text-sm font-medium text-gray-700">Text Position</label>
                 <select 
-                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                   value={textPosition}
                   onChange={(e) => setTextPosition(e.target.value)}
                 >
@@ -161,9 +155,9 @@ export default function ModernCustomizer({ product, onSubmit }: CustomizerProps)
               </div>
             
               <div className="space-y-2">
-                <label className="block text-sm font-medium">Font Family</label>
+                <label className="block text-sm font-medium text-gray-700">Font Family</label>
                 <select 
-                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                   value={fontFamily}
                   onChange={(e) => setFontFamily(e.target.value)}
                 >
@@ -176,7 +170,7 @@ export default function ModernCustomizer({ product, onSubmit }: CustomizerProps)
               </div>
               
               <div className="space-y-2">
-                <label className="block text-sm font-medium">Font Size: {fontSize}px</label>
+                <label className="block text-sm font-medium text-gray-700">Font Size: {fontSize}px</label>
                 <input
                   type="range"
                   value={fontSize}
@@ -184,24 +178,24 @@ export default function ModernCustomizer({ product, onSubmit }: CustomizerProps)
                   min={8}
                   max={36}
                   step={1}
-                  className="w-full"
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
                 />
               </div>
               
               <div className="space-y-2">
-                <label className="block text-sm font-medium">Text Color</label>
+                <label className="block text-sm font-medium text-gray-700">Text Color</label>
                 <input
                   type="color"
                   value={textColor}
                   onChange={(e) => setTextColor(e.target.value)}
-                  className="w-full h-10"
+                  className="w-full h-10 rounded cursor-pointer"
                 />
               </div>
             
               <div className="space-y-2">
-                <label className="block text-sm font-medium">Product Variant</label>
+                <label className="block text-sm font-medium text-gray-700">Product Variant</label>
                 <select 
-                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                   value={selectedVariantId} 
                   onChange={(e) => setSelectedVariantId(e.target.value)}
                 >
@@ -218,18 +212,17 @@ export default function ModernCustomizer({ product, onSubmit }: CustomizerProps)
               </div>
             </div>
             
-            <Divider className="my-2" />
+            <hr className="my-4 border-gray-200" />
             
-            <Button 
+            <button 
               type="submit" 
-              color="primary" 
-              className="w-full py-3 mt-4"
+              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 mt-4"
             >
               Add to Cart
-            </Button>
+            </button>
           </form>
         </div>
       </div>
-    </Card>
+    </div>
   );
 } 
