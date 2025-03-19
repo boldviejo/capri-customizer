@@ -146,14 +146,39 @@
     
     function retryRedirect() {
       if (targetUrl) {
+        // Reset the redirect attempt counter
+        sessionStorage.removeItem('redirectAttempt');
         window.location.href = targetUrl;
       } else {
         showError('Unable to retry. No valid target URL available.', allParams);
       }
     }
     
+    function clearRedirectLoopData() {
+      // Clear all stored data related to redirects
+      sessionStorage.removeItem('redirectAttempt');
+      sessionStorage.removeItem('pendingBridgeRequest');
+      sessionStorage.removeItem('retryCount');
+    }
+    
     (function() {
       try {
+        // Check for redirect loop
+        const redirectAttempt = parseInt(sessionStorage.getItem('redirectAttempt') || '0', 10);
+        console.log('Current redirect attempt count:', redirectAttempt);
+        
+        if (redirectAttempt > 2) {
+          // We're in a redirect loop, show error and clear data
+          clearRedirectLoopData();
+          showError('Redirect loop detected. Please try again or return to cart.', { 
+            redirectAttempts: redirectAttempt 
+          });
+          return;
+        }
+        
+        // Increment the redirect attempt counter
+        sessionStorage.setItem('redirectAttempt', (redirectAttempt + 1).toString());
+        
         // Get parameters from URL and store them globally
         allParams = {
           productHandle: getParam('product_handle'),
@@ -172,12 +197,13 @@
         
         // Validate required parameters
         if (!allParams.productHandle) {
+          clearRedirectLoopData();
           showError('Missing product information (handle) in URL parameters', allParams);
           return;
         }
 
         // Build the redirect URL to the Cloud Run app
-        const appDomain = "https://capri-customizer-6sablvg6la-uc.a.run.app";
+        const appDomain = "https://capri-customizer-86025189386.us-central1.run.app";
         const path = `/edit/${allParams.productHandle}`;
         
         try {
@@ -211,6 +237,7 @@
             window.location.href = targetUrl;
           }, 500);
         } catch (urlError) {
+          clearRedirectLoopData();
           showError('Error forming the redirect URL', {
             error: urlError.message, 
             baseUrl: appDomain,
@@ -219,6 +246,7 @@
           });
         }
       } catch (error) {
+        clearRedirectLoopData();
         showError('Unexpected error during redirect', {
           error: error.message,
           stack: error.stack

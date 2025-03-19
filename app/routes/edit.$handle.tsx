@@ -362,6 +362,18 @@ export default function EditCustomizer() {
       initialValues,
       searchParams: Object.fromEntries([...searchParams.entries()])
     });
+    
+    // Clear any stored bridge requests on fresh load to avoid redirect loops
+    if (typeof window !== 'undefined') {
+      // Check if redirect attempt counter is too high
+      const redirectAttempt = parseInt(sessionStorage.getItem('redirectAttempt') || '0', 10);
+      if (redirectAttempt > 2) { // Allow only 2 attempts
+        console.log("Too many redirect attempts, clearing stored bridge request");
+        sessionStorage.removeItem('pendingBridgeRequest');
+        sessionStorage.removeItem('retryCount');
+        sessionStorage.removeItem('redirectAttempt');
+      }
+    }
   }, [product, error, initialValues, searchParams]);
   
   // Handle the action response (success/error)
@@ -376,6 +388,10 @@ export default function EditCustomizer() {
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('pendingBridgeRequest', actionData.bridgeUrl);
         sessionStorage.setItem('retryCount', '0');
+        
+        // Set redirect attempt counter
+        const redirectAttempt = parseInt(sessionStorage.getItem('redirectAttempt') || '0', 10);
+        sessionStorage.setItem('redirectAttempt', (redirectAttempt + 1).toString());
         
         // Log the redirect action
         console.log("Redirecting to bridge URL now...");
@@ -396,10 +412,21 @@ export default function EditCustomizer() {
       if (typeof window !== 'undefined') {
         const storedBridgeRequest = sessionStorage.getItem('pendingBridgeRequest');
         const storedRetryCount = parseInt(sessionStorage.getItem('retryCount') || '0', 10);
+        const redirectAttempt = parseInt(sessionStorage.getItem('redirectAttempt') || '0', 10);
+        
+        // Check redirect attempt counter to prevent loops
+        if (redirectAttempt > 2) {
+          console.log("Too many redirect attempts, clearing stored request");
+          sessionStorage.removeItem('pendingBridgeRequest');
+          sessionStorage.removeItem('retryCount');
+          sessionStorage.removeItem('redirectAttempt');
+          return;
+        }
         
         if (storedBridgeRequest) {
           console.log("Found stored bridge request:", storedBridgeRequest);
           console.log("Current retry count:", storedRetryCount);
+          console.log("Current redirect attempt:", redirectAttempt);
           
           setPendingBridgeRequest(storedBridgeRequest);
           setRetryCount(storedRetryCount);
@@ -410,6 +437,9 @@ export default function EditCustomizer() {
             sessionStorage.setItem('retryCount', newRetryCount.toString());
             console.log("Incrementing retry count to:", newRetryCount);
             
+            // Increment redirect attempt counter
+            sessionStorage.setItem('redirectAttempt', (redirectAttempt + 1).toString());
+            
             // Redirect to bridge URL
             console.log("Retrying redirect to:", storedBridgeRequest);
             window.location.href = storedBridgeRequest;
@@ -418,6 +448,7 @@ export default function EditCustomizer() {
             console.log("Max retries reached, clearing stored request");
             sessionStorage.removeItem('pendingBridgeRequest');
             sessionStorage.removeItem('retryCount');
+            sessionStorage.removeItem('redirectAttempt');
             alert("Failed to update your cart after multiple attempts. Please try again.");
           }
         } else {
@@ -426,7 +457,13 @@ export default function EditCustomizer() {
       }
     };
     
-    checkForStoredBridgeRequest();
+    // Only check for stored requests if not already checking for redirect loops
+    const redirectAttempt = typeof window !== 'undefined' ? 
+      parseInt(sessionStorage.getItem('redirectAttempt') || '0', 10) : 0;
+      
+    if (redirectAttempt <= 2) {
+      checkForStoredBridgeRequest();
+    }
   }, [maxRetries]);
   
   const retryLastBridge = () => {
@@ -442,6 +479,7 @@ export default function EditCustomizer() {
         if (typeof window !== 'undefined') {
           sessionStorage.removeItem('pendingBridgeRequest');
           sessionStorage.removeItem('retryCount');
+          sessionStorage.removeItem('redirectAttempt');
         }
         alert("Failed to update your cart after multiple attempts. Please try again.");
       }
@@ -453,6 +491,7 @@ export default function EditCustomizer() {
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('pendingBridgeRequest');
       sessionStorage.removeItem('retryCount');
+      sessionStorage.removeItem('redirectAttempt');
     }
   };
   
@@ -462,6 +501,11 @@ export default function EditCustomizer() {
     if (initialValues.itemKey) {
       formData.append('itemKey', initialValues.itemKey);
       console.log("Added itemKey to form data:", initialValues.itemKey);
+    }
+    
+    // Clear any redirect attempt counter
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('redirectAttempt');
     }
     
     // Submit the form data to the action
@@ -524,10 +568,22 @@ export default function EditCustomizer() {
         </div>
         
         <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
-          <Button variant="primary" onClick={() => window.location.href = '/cart'}>
+          <Button variant="primary" onClick={() => {
+            // Clear any redirect attempt counter
+            if (typeof window !== 'undefined') {
+              sessionStorage.removeItem('redirectAttempt');
+            }
+            window.location.href = '/cart';
+          }}>
             Return to Cart
           </Button>
-          <Button onClick={() => window.location.reload()}>
+          <Button onClick={() => {
+            // Clear any redirect attempt counter
+            if (typeof window !== 'undefined') {
+              sessionStorage.removeItem('redirectAttempt');
+            }
+            window.location.reload();
+          }}>
             Try Again
           </Button>
         </div>
@@ -575,7 +631,15 @@ export default function EditCustomizer() {
         </Card>
         
         <div className="buttons-container">
-          <Button variant="plain" onClick={() => window.location.href = '/cart'}>
+          <Button variant="plain" onClick={() => {
+            // Clear any redirect attempt counter
+            if (typeof window !== 'undefined') {
+              sessionStorage.removeItem('redirectAttempt');
+              sessionStorage.removeItem('pendingBridgeRequest');
+              sessionStorage.removeItem('retryCount');
+            }
+            window.location.href = '/cart';
+          }}>
             Cancel and Return to Cart
           </Button>
         </div>

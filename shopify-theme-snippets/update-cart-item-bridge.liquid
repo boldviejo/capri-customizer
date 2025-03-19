@@ -126,6 +126,15 @@
     // Store parameters for use throughout the script
     let params = {};
     
+    // Helper function to clear all redirect-related data
+    function clearRedirectData() {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem('redirectAttempt');
+        sessionStorage.removeItem('pendingBridgeRequest');
+        sessionStorage.removeItem('retryCount');
+      }
+    }
+    
     // Function to extract and validate URL parameters
     function getParams() {
       const urlParams = new URLSearchParams(window.location.search);
@@ -145,6 +154,9 @@
     
     // Show error message function
     function showError(message, debugInfo) {
+      // Clear any redirect loop data
+      clearRedirectData();
+      
       // Hide spinner, update message
       document.getElementById('spinner').style.display = 'none';
       document.getElementById('message').textContent = 'There was a problem updating your cart';
@@ -174,6 +186,9 @@
     
     // Show success message function
     function showSuccess(message) {
+      // Clear any redirect loop data
+      clearRedirectData();
+      
       // Hide spinner, update message
       document.getElementById('spinner').style.display = 'none';
       document.getElementById('message').textContent = 'Successfully updated your cart!';
@@ -195,6 +210,24 @@
     // Function to update cart item
     async function updateCartItem() {
       try {
+        // Check if we're in a redirect loop
+        if (typeof sessionStorage !== 'undefined') {
+          const redirectAttempt = parseInt(sessionStorage.getItem('redirectAttempt') || '0', 10);
+          console.log('Current redirect attempt count:', redirectAttempt);
+          
+          if (redirectAttempt > 2) {
+            // We're in a redirect loop, show error and clear data
+            clearRedirectData();
+            showError('Redirect loop detected while updating cart. Please try again or return to cart.', {
+              redirectAttempts: redirectAttempt 
+            });
+            return;
+          }
+          
+          // Increment the redirect attempt counter
+          sessionStorage.setItem('redirectAttempt', (redirectAttempt + 1).toString());
+        }
+        
         // Get and validate parameters
         params = getParams();
         console.log('Parameters received:', params);
