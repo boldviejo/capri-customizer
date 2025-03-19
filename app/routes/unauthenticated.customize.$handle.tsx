@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { json, redirect, type LoaderFunctionArgs, type ActionFunctionArgs, type LinksFunction } from "@remix-run/node";
+import { json, type LoaderFunctionArgs, type ActionFunctionArgs, type LinksFunction } from "@remix-run/node";
 import { useLoaderData, useSubmit, Form, useActionData } from "@remix-run/react";
 import {
   Text,
@@ -195,7 +195,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const fontSize = Number(formData.get("fontSize") || 16);
   const color = String(formData.get("color") || "");
   const variantId = String(formData.get("variantId") || "");
-  const cartId = String(formData.get("cartId") || "");
   
   if (!text || !fontFamily || !fontSize || !color || !variantId) {
     return json({
@@ -205,177 +204,29 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
   
   try {
-    let existingCartId = cartId;
+    // Get any additional data we need
+    const shopifyDomain = getShopifyDomain();
     
-    // If there's no cartId provided, we'll need to create a new cart
-    // Shopify carts are tied to browser cookies, so we can't easily fetch an existing cart
-    // without the cart ID
-    
-    let query = '';
-    let variables: any = {};
-    
-    if (existingCartId) {
-      // If we have a cart ID, add to existing cart
-      query = `
-        mutation addToCart($cartId: ID!, $variantId: ID!, $customText: String!, $fontFamily: String!, $fontSize: String!, $color: String!) {
-          cartLinesAdd(
-            cartId: $cartId,
-            lines: [
-              {
-                quantity: 1
-                merchandiseId: $variantId
-                attributes: [
-                  { key: "Custom Text", value: $customText }
-                  { key: "Font", value: $fontFamily }
-                  { key: "Font Size", value: $fontSize }
-                  { key: "Text Color", value: $color }
-                ]
-              }
-            ]
-          ) {
-            cart {
-              id
-              checkoutUrl
-              totalQuantity
-              lines(first: 10) {
-                edges {
-                  node {
-                    id
-                    quantity
-                    merchandise {
-                      ... on ProductVariant {
-                        id
-                        title
-                        product {
-                          title
-                        }
-                      }
-                    }
-                    attributes {
-                      key
-                      value
-                    }
-                  }
-                }
-              }
-            }
-            userErrors {
-              field
-              message
-            }
-          }
-        }
-      `;
-      variables = {
-        cartId: existingCartId,
-        variantId,
-        customText: text,
-        fontFamily,
-        fontSize: fontSize.toString(),
-        color,
-      };
-    } else {
-      // Create a new cart
-      query = `
-        mutation createCart($variantId: ID!, $customText: String!, $fontFamily: String!, $fontSize: String!, $color: String!) {
-          cartCreate(
-            input: {
-              lines: [
-                {
-                  quantity: 1
-                  merchandiseId: $variantId
-                  attributes: [
-                    { key: "Custom Text", value: $customText }
-                    { key: "Font", value: $fontFamily }
-                    { key: "Font Size", value: $fontSize }
-                    { key: "Text Color", value: $color }
-                  ]
-                }
-              ]
-            }
-          ) {
-            cart {
-              id
-              checkoutUrl
-              totalQuantity
-              lines(first: 10) {
-                edges {
-                  node {
-                    id
-                    quantity
-                    merchandise {
-                      ... on ProductVariant {
-                        id
-                        title
-                        product {
-                          title
-                        }
-                      }
-                    }
-                    attributes {
-                      key
-                      value
-                    }
-                  }
-                }
-              }
-            }
-            userErrors {
-              field
-              message
-            }
-          }
-        }
-      `;
-      variables = {
-        variantId,
-        customText: text,
-        fontFamily,
-        fontSize: fontSize.toString(),
-        color,
-      };
-    }
-
-    const responseData = await queryStorefrontApi(query, variables);
-    
-    // Determine which response structure we get based on the query used
-    const operationName = existingCartId ? 'cartLinesAdd' : 'cartCreate';
-    const userErrors = responseData.data?.[operationName]?.userErrors || [];
-    
-    if (userErrors.length > 0) {
-      return json({
-        success: false,
-        message: userErrors[0].message || "Failed to add item to cart"
-      });
-    }
-    
-    const cartDetails = responseData.data?.[operationName]?.cart;
-    
-    if (!cartDetails) {
-      return json({
-        success: false,
-        message: "Failed to create or update cart"
-      });
-    }
-    
-    // Instead of redirecting directly (which is causing issues),
-    // return the cart information to the client
+    // Rather than adding to cart on the server, we'll let the client handle it using the Ajax Cart API
+    // Return the necessary data for the client to add the item to cart
     return json({
       success: true,
-      cartData: {
-        id: cartDetails.id,
-        totalQuantity: cartDetails.totalQuantity,
-        checkoutUrl: cartDetails.checkoutUrl,
-        lines: cartDetails.lines
+      itemData: {
+        variantId: variantId.replace("gid://shopify/ProductVariant/", ""), // Get clean numeric ID
+        text,
+        fontFamily,
+        fontSize: fontSize.toString(),
+        color
       },
-      message: "Item added to cart successfully"
+      shopifyDomain,
+      message: "Ready to add to cart"
     });
     
   } catch (error) {
-    console.error("Error adding to cart:", error);
+    console.error("Error processing form:", error);
     return json({
       success: false,
-      message: "An error occurred while adding your customization to cart"
+      message: "An error occurred while processing your customization"
     });
   }
 };
@@ -463,60 +314,70 @@ export default function ProductCustomizer() {
     formData.append("color", textColor);
     formData.append("variantId", selectedVariantId);
     
-    // Add cart ID if we have one
-    if (cartId) {
-      formData.append("cartId", cartId);
-    }
-    
     const response = await submit(formData, { method: "post", replace: true });
     
-    // The response is handled by useActionData in a useEffect below
+    // The response is handled by useActionData in a useEffect above
   };
   
-  // Handle form submission result
+  // Handle form submission result with Ajax Cart API
   const handleActionResponse = (response: any) => {
-    if (response?.success) {
-      // Save cart ID for future use
-      if (response.cartData?.id) {
-        localStorage.setItem("shopifyCartId", response.cartData.id);
-        setCartId(response.cartData.id);
-      }
-      
-      // Update cart state
-      if (response.cartData) {
-        setCartQuantity(response.cartData.totalQuantity || 0);
-        setCheckoutUrl(response.cartData.checkoutUrl || "");
-      }
-      
-      setAddedToCart(true);
-      
-      // Clear form for next item
-      setCustomText("");
-      
-      // Redirect to Shopify cart page
-      if (response.cartData?.id) {
-        // Extract the variant IDs and quantities from the response to build a cart permalink
-        const lineItems = response.cartData.lines?.edges || [];
-        if (lineItems.length > 0) {
-          // Use the domain from loader data, or fall back to the client helper function
-          const domain = shopifyDomain || getClientShopifyDomain();
-          
-          // Create the permalink URL format: https://domain.myshopify.com/cart/{variant_id}:{quantity},{variant_id2}:{quantity2}
-          const itemsString = lineItems.map((item: any) => {
-            const variantId = item.node.merchandise.id.split('/').pop();
-            const quantity = item.node.quantity;
-            return `${variantId}:${quantity}`;
-          }).join(',');
-          
-          const cartUrl = `https://${domain}/cart/${itemsString}`;
-          
-          console.log("Redirecting to cart URL:", cartUrl);
-          // Redirect to the cart page
-          window.location.href = cartUrl;
-        }
-      }
+    if (response?.success && response.itemData) {
+      // We have the item data - now add to cart using Shopify's Ajax Cart API
+      addToCartViaAjax(response.itemData, response.shopifyDomain);
     } else if (response?.message) {
       setErrorMessage(response.message);
+    }
+  };
+  
+  // Function to add to cart via Ajax Cart API
+  const addToCartViaAjax = async (itemData: any, domain: string) => {
+    try {
+      // Construct the properties object for the customization details
+      const properties = {
+        'Custom Text': itemData.text,
+        'Font': itemData.fontFamily,
+        'Font Size': itemData.fontSize,
+        'Text Color': itemData.color
+      };
+      
+      // Create the form data
+      const cartFormData = {
+        id: itemData.variantId,
+        quantity: 1,
+        properties: properties
+      };
+      
+      console.log("Adding to cart via Ajax:", cartFormData);
+      
+      // Make the Ajax request to add to cart
+      const response = await fetch(`https://${domain}/cart/add.js`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(cartFormData)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to add to cart: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log("Added to cart successfully:", data);
+      
+      // Set success state
+      setAddedToCart(true);
+      setCartQuantity(prevQuantity => prevQuantity + 1);
+      
+      // Clear form
+      setCustomText("");
+      
+      // Redirect to cart page - this should now work since we've used the Ajax API
+      window.location.href = `https://${domain}/cart`;
+      
+    } catch (error) {
+      console.error("Error adding to cart:", error);
+      setErrorMessage("Failed to add item to cart. Please try again.");
     }
   };
   
