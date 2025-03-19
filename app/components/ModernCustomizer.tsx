@@ -36,6 +36,9 @@ export default function ModernCustomizer({
   initialValues = {}, 
   submitButtonText = "Add to Cart" 
 }: CustomizerProps) {
+  console.log("ModernCustomizer initialValues:", initialValues);
+
+  // Initialize state with values or defaults
   const [customText, setCustomText] = useState(initialValues.customText || "");
   const [selectedVariantId, setSelectedVariantId] = useState(initialValues.selectedVariantId || "");
   const [fontFamily, setFontFamily] = useState(initialValues.fontFamily || "Arial");
@@ -43,6 +46,20 @@ export default function ModernCustomizer({
   const [textColor, setTextColor] = useState(initialValues.textColor || "#000000");
   const [textPosition, setTextPosition] = useState(initialValues.textPosition || "center");
   const [imagePreview, setImagePreview] = useState<string | null>(initialValues.imagePreview || null);
+  
+  // Log the initial state for debugging
+  useEffect(() => {
+    console.log("ModernCustomizer initial state:", {
+      customText,
+      selectedVariantId,
+      fontFamily,
+      fontSize,
+      textColor,
+      textPosition,
+      imagePreview,
+      productVariants: product.variants.map(v => ({ id: v.id, title: v.title }))
+    });
+  }, []);
 
   useEffect(() => {
     // Only set default variant if one wasn't provided in initialValues
@@ -61,17 +78,33 @@ export default function ModernCustomizer({
     event.preventDefault();
     
     const formData = new FormData();
-    formData.append("text", customText);
-    formData.append("fontFamily", fontFamily);
-    formData.append("fontSize", fontSize.toString());
-    formData.append("color", textColor);
-    formData.append("variantId", selectedVariantId);
-    formData.append("position", textPosition);
     
+    // Add all required fields with validation
+    formData.append("text", customText || "");
+    formData.append("fontFamily", fontFamily || "Arial");
+    formData.append("fontSize", fontSize ? fontSize.toString() : "16");
+    formData.append("color", textColor || "#000000");
+    formData.append("variantId", selectedVariantId);
+    formData.append("position", textPosition || "center");
+    formData.append("textPosition", textPosition || "center"); // Include both formats
+    
+    // Handle image preview
     if (imagePreview && !product.images.some(img => img.url === imagePreview)) {
       formData.append("uploadedImage", imagePreview);
     }
     
+    // Log form data being submitted
+    console.log("Submitting form data:", {
+      text: customText,
+      fontFamily,
+      fontSize: fontSize.toString(),
+      color: textColor,
+      variantId: selectedVariantId,
+      position: textPosition,
+      hasUploadedImage: !!imagePreview && !product.images.some(img => img.url === imagePreview)
+    });
+    
+    // Submit the form
     onSubmit(formData);
   };
 

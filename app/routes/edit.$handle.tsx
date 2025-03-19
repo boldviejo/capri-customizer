@@ -50,6 +50,12 @@ interface LoaderData {
     variantId?: string;
     itemKey?: string;
   };
+  debug: {
+    handle: string;
+    rawParams: Record<string, string | null>;
+    responseData?: any;
+    apiError?: string;
+  };
 }
 
 interface ActionData {
@@ -69,13 +75,15 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       console.log("Error: Product handle is missing");
       return json({ 
         error: "Product handle is required",
-        initialValues: {} 
+        initialValues: {},
+        debug: { params }
       }, { status: 400 });
     }
 
     // Parse query parameters for initial values
     const url = new URL(request.url);
-    console.log("URL search params:", Object.fromEntries([...url.searchParams.entries()]));
+    const rawParams = Object.fromEntries([...url.searchParams.entries()]);
+    console.log("URL search params:", rawParams);
     
     // Check for both snake_case and camelCase parameter formats to handle both Shopify and direct parameters
     const initialValues = {
@@ -90,78 +98,107 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     };
     
     console.log("Parsed initialValues:", initialValues);
-
-    // Using Storefront API for product fetching
-    const query = `
-      query getProduct($handle: String!) {
-        productByHandle(handle: $handle) {
-          id
-          title
-          handle
-          descriptionHtml
-          variants(first: 100) {
-            edges {
-              node {
-                id
-                title
-                price {
-                  amount
-                  currencyCode
+    
+    try {
+      // Using Storefront API for product fetching
+      const query = `
+        query getProduct($handle: String!) {
+          productByHandle(handle: $handle) {
+            id
+            title
+            handle
+            descriptionHtml
+            variants(first: 100) {
+              edges {
+                node {
+                  id
+                  title
+                  price {
+                    amount
+                    currencyCode
+                  }
+                  availableForSale
                 }
-                availableForSale
               }
             }
-          }
-          images(first: 1) {
-            edges {
-              node {
-                url
-                altText
+            images(first: 1) {
+              edges {
+                node {
+                  url
+                  altText
+                }
               }
             }
           }
         }
+      `;
+      
+      const variables = { handle };
+      console.log("Querying Shopify API with variables:", variables);
+      
+      const responseData = await queryStorefrontApi(query, variables);
+      console.log("Shopify API response received");
+      
+      if (!responseData.data || !responseData.data.productByHandle) {
+        console.error("Product not found in Shopify API response:", responseData);
+        return json({ 
+          error: "Product not found in Shopify store",
+          initialValues,
+          debug: { 
+            handle,
+            rawParams,
+            responseData 
+          }
+        }, { status: 404 });
       }
-    `;
-    
-    const variables = { handle };
-    const responseData = await queryStorefrontApi(query, variables);
-    const productData = responseData.data.productByHandle;
+      
+      const productData = responseData.data.productByHandle;
+      console.log("Product data found:", productData.title);
 
-    if (!productData) {
+      const product = {
+        id: productData.id,
+        title: productData.title,
+        handle: productData.handle,
+        description: productData.descriptionHtml,
+        variants: productData.variants.edges.map(({ node }: any) => ({
+          id: node.id,
+          title: node.title,
+          price: node.price.amount,
+          availableForSale: node.availableForSale,
+        })),
+        images: productData.images.edges.map(({ node }: any) => ({
+          url: node.url,
+          altText: node.altText || productData.title,
+        }))
+      };
+
+      return json({
+        product,
+        error: null,
+        initialValues,
+        debug: { handle, rawParams }
+      });
+    } catch (apiError) {
+      console.error("Error in Shopify API request:", apiError);
       return json({ 
-        error: "Product not found",
-        initialValues
-      }, { status: 404 });
+        error: "Failed to fetch product data from Shopify",
+        initialValues,
+        debug: { 
+          handle, 
+          rawParams,
+          apiError: apiError instanceof Error ? apiError.message : String(apiError)
+        }
+      }, { status: 500 });
     }
-
-    const product = {
-      id: productData.id,
-      title: productData.title,
-      handle: productData.handle,
-      description: productData.descriptionHtml,
-      variants: productData.variants.edges.map(({ node }: any) => ({
-        id: node.id,
-        title: node.title,
-        price: node.price.amount,
-        availableForSale: node.availableForSale,
-      })),
-      images: productData.images.edges.map(({ node }: any) => ({
-        url: node.url,
-        altText: node.altText || productData.title,
-      }))
-    };
-
-    return json({
-      product,
-      error: null,
-      initialValues
-    });
   } catch (error) {
-    console.error("Error loading product:", error);
+    console.error("Unexpected error in loader:", error);
     return json({ 
-      error: "Failed to load product",
-      initialValues: {}
+      error: "An unexpected error occurred while loading the product",
+      initialValues: {},
+      debug: { 
+        params,
+        error: error instanceof Error ? error.message : String(error)
+      }
     }, { status: 500 });
   }
 };
@@ -170,19 +207,35 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     const formData = await request.formData();
     
+    console.log("Received form data:", Object.fromEntries(formData.entries()));
+    
+    // Extract values from form data
     const text = String(formData.get("text") || "");
     const fontFamily = String(formData.get("fontFamily") || "");
     const fontSize = String(formData.get("fontSize") || "16");
     const color = String(formData.get("color") || "");
     const variantId = String(formData.get("variantId") || "");
-    const position = String(formData.get("position") || "center");
+    const position = String(formData.get("position") || formData.get("textPosition") || "center");
     const uploadedImage = formData.get("uploadedImage") ? String(formData.get("uploadedImage")) : null;
     const itemKey = String(formData.get("itemKey") || "");
     
+    console.log("Extracted form values:", { text, fontFamily, fontSize, color, variantId, position, uploadedImage, itemKey });
+    
     if (!text || !fontFamily || !fontSize || !color || !variantId) {
+      console.error("Missing required fields:", { text, fontFamily, fontSize, color, variantId });
       return json({
         success: false,
-        message: "Missing required fields"
+        message: "Missing required fields",
+        debug: { 
+          receivedValues: { text, fontFamily, fontSize, color, variantId, position, itemKey },
+          missingFields: [
+            !text ? 'text' : null,
+            !fontFamily ? 'fontFamily' : null,
+            !fontSize ? 'fontSize' : null,
+            !color ? 'color' : null,
+            !variantId ? 'variantId' : null
+          ].filter(Boolean)
+        }
       });
     }
     
@@ -190,6 +243,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const shopifyDomain = getShopifyDomain();
     
     if (!shopifyDomain) {
+      console.error("Could not determine Shopify domain");
       throw new Error("Could not determine Shopify domain");
     }
     
@@ -200,47 +254,52 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
     
     // Format the bridge URL with all parameters for updating the existing item
-    const bridgeUrl = new URL(`https://${shopifyDomain}/pages/update-cart-item-bridge`);
-    
-    // Add parameters using URLSearchParams for proper encoding
-    bridgeUrl.searchParams.append('variant_id', finalVariantId);
-    bridgeUrl.searchParams.append('custom_text', text);
-    bridgeUrl.searchParams.append('font_family', fontFamily);
-    bridgeUrl.searchParams.append('font_size', fontSize);
-    bridgeUrl.searchParams.append('text_color', color);
-    bridgeUrl.searchParams.append('position', position);
-    
-    // Add item key to identify which cart item to update
-    if (itemKey) {
-      bridgeUrl.searchParams.append('item_key', itemKey);
+    try {
+      const bridgeUrl = new URL(`https://${shopifyDomain}/pages/update-cart-item-bridge`);
+      
+      // Add parameters using URLSearchParams for proper encoding
+      bridgeUrl.searchParams.append('variant_id', finalVariantId);
+      bridgeUrl.searchParams.append('custom_text', text);
+      bridgeUrl.searchParams.append('font_family', fontFamily);
+      bridgeUrl.searchParams.append('font_size', fontSize);
+      bridgeUrl.searchParams.append('text_color', color);
+      bridgeUrl.searchParams.append('position', position);
+      
+      // Add item key to identify which cart item to update
+      if (itemKey) {
+        bridgeUrl.searchParams.append('item_key', itemKey);
+      }
+      
+      // Add pet photo URL if available
+      if (uploadedImage) {
+        bridgeUrl.searchParams.append('pet_photo_url', uploadedImage);
+      }
+      
+      console.log("Generated update bridge URL:", bridgeUrl.toString());
+      
+      // Return bridge URL for client to handle
+      return json({
+        success: true,
+        bridgeUrl: bridgeUrl.toString(),
+        message: "Redirecting to update item bridge"
+      });
+    } catch (urlError) {
+      console.error("Error creating bridge URL:", urlError);
+      throw new Error(`Failed to create bridge URL: ${urlError instanceof Error ? urlError.message : String(urlError)}`);
     }
-    
-    // Add pet photo URL if available
-    if (uploadedImage) {
-      bridgeUrl.searchParams.append('pet_photo_url', uploadedImage);
-    }
-    
-    console.log("Generated update bridge URL:", bridgeUrl.toString());
-    
-    // Return bridge URL for client to handle
-    return json({
-      success: true,
-      bridgeUrl: bridgeUrl.toString(),
-      message: "Redirecting to update item bridge"
-    });
-    
   } catch (error) {
-    console.error("Error creating update bridge URL:", error);
+    console.error("Error processing form submission:", error);
     return json({
       success: false,
-      message: error instanceof Error ? error.message : "An error occurred while updating your customization"
+      message: error instanceof Error ? error.message : "An error occurred while updating your customization",
+      debug: { error: String(error) }
     });
   }
 };
 
 export default function EditCustomizer() {
   const data = useLoaderData<typeof loader>() as LoaderData;
-  const { product, error, initialValues } = data;
+  const { product, error, initialValues, debug } = data;
   const actionData = useActionData<typeof action>() as ActionData;
   const [searchParams] = useSearchParams();
   const submit = useSubmit();
@@ -334,15 +393,31 @@ export default function EditCustomizer() {
   
   if (error) {
     return (
-      <div className="error-container">
-        <Text variant="heading2xl" as="h1">Error</Text>
-        <Text as="p">{error}</Text>
-        <pre style={{ margin: '20px 0', padding: '10px', background: '#f5f5f5', overflow: 'auto', maxWidth: '100%' }}>
-          {JSON.stringify(initialValues, null, 2)}
-        </pre>
-        <div style={{ marginTop: '20px' }}>
+      <div className="error-container" style={{ padding: "20px", maxWidth: "800px", margin: "0 auto" }}>
+        <Text variant="heading2xl" as="h1">{error}</Text>
+        
+        <div style={{ marginTop: "20px", padding: "15px", border: "1px solid #e0e0e0", borderRadius: "4px", background: "#f8f9fa" }}>
+          <Text as="h2" variant="headingLg">Initial Values</Text>
+          <pre style={{ margin: '10px 0', padding: '10px', background: '#f0f0f0', overflow: 'auto', maxWidth: '100%', borderRadius: "4px" }}>
+            {JSON.stringify(initialValues, null, 2)}
+          </pre>
+          
+          {debug && (
+            <>
+              <Text as="h2" variant="headingLg">Debug Information</Text>
+              <pre style={{ margin: '10px 0', padding: '10px', background: '#f0f0f0', overflow: 'auto', maxWidth: '100%', borderRadius: "4px" }}>
+                {JSON.stringify(debug, null, 2)}
+              </pre>
+            </>
+          )}
+        </div>
+        
+        <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
           <Button variant="primary" onClick={() => window.location.href = '/cart'}>
             Return to Cart
+          </Button>
+          <Button onClick={() => window.location.reload()}>
+            Try Again
           </Button>
         </div>
       </div>
@@ -351,16 +426,33 @@ export default function EditCustomizer() {
   
   if (!product) {
     return (
-      <div className="loading-container">
-        <Text as="p">Loading product data...</Text>
-        {initialValues && (
-          <div style={{ marginTop: '20px' }}>
-            <Text as="p">Debugging information:</Text>
-            <pre style={{ margin: '10px 0', padding: '10px', background: '#f5f5f5', overflow: 'auto', maxWidth: '100%' }}>
-              {JSON.stringify(initialValues, null, 2)}
-            </pre>
-          </div>
-        )}
+      <div className="loading-container" style={{ padding: "20px", maxWidth: "800px", margin: "0 auto" }}>
+        <Text as="h1" variant="heading2xl">Loading product data...</Text>
+        
+        <div style={{ marginTop: "20px", padding: "15px", border: "1px solid #e0e0e0", borderRadius: "4px", background: "#f8f9fa" }}>
+          <Text as="h2" variant="headingLg">Request Information</Text>
+          <pre style={{ margin: '10px 0', padding: '10px', background: '#f0f0f0', overflow: 'auto', maxWidth: '100%', borderRadius: "4px" }}>
+            {JSON.stringify(initialValues, null, 2)}
+          </pre>
+          
+          {debug && (
+            <>
+              <Text as="h2" variant="headingLg">Debug Information</Text>
+              <pre style={{ margin: '10px 0', padding: '10px', background: '#f0f0f0', overflow: 'auto', maxWidth: '100%', borderRadius: "4px" }}>
+                {JSON.stringify(debug, null, 2)}
+              </pre>
+            </>
+          )}
+        </div>
+        
+        <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
+          <Button variant="primary" onClick={() => window.location.href = '/cart'}>
+            Return to Cart
+          </Button>
+          <Button onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </div>
       </div>
     );
   }
