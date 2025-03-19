@@ -204,26 +204,28 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
   
   try {
-    // Get any additional data we need
+    // Get the Shopify domain
     const shopifyDomain = getShopifyDomain();
     
-    // Rather than adding to cart on the server, we'll let the client handle it using the Ajax Cart API
-    // Return the necessary data for the client to add the item to cart
+    // Extract the numeric variant ID (removing the gid:// prefix)
+    const cleanVariantId = variantId.replace("gid://shopify/ProductVariant/", "");
+    
+    // Return the data to be passed to the bridge page
     return json({
       success: true,
-      itemData: {
-        variantId: variantId.replace("gid://shopify/ProductVariant/", ""), // Get clean numeric ID
+      customizationData: {
+        variantId: cleanVariantId,
         text,
         fontFamily,
         fontSize: fontSize.toString(),
-        color
+        color,
+        shopifyDomain
       },
-      shopifyDomain,
       message: "Ready to add to cart"
     });
     
   } catch (error) {
-    console.error("Error processing form:", error);
+    console.error("Error processing customization:", error);
     return json({
       success: false,
       message: "An error occurred while processing your customization"
@@ -315,69 +317,30 @@ export default function ProductCustomizer() {
     formData.append("variantId", selectedVariantId);
     
     const response = await submit(formData, { method: "post", replace: true });
-    
-    // The response is handled by useActionData in a useEffect above
   };
   
-  // Handle form submission result with Ajax Cart API
+  // Handle form submission result
   const handleActionResponse = (response: any) => {
-    if (response?.success && response.itemData) {
-      // We have the item data - now add to cart using Shopify's Ajax Cart API
-      addToCartViaAjax(response.itemData, response.shopifyDomain);
+    if (response?.success && response.customizationData) {
+      // We have the customization data - redirect to our bridge page
+      const data = response.customizationData;
+      const domain = data.shopifyDomain || getClientShopifyDomain();
+      
+      // Encode all parameters for URL safety
+      const bridgeUrl = `https://${domain}/pages/add-to-cart-bridge?` + 
+        `variant_id=${encodeURIComponent(data.variantId)}&` +
+        `custom_text=${encodeURIComponent(data.text)}&` +
+        `font_family=${encodeURIComponent(data.fontFamily)}&` +
+        `font_size=${encodeURIComponent(data.fontSize)}&` +
+        `text_color=${encodeURIComponent(data.color)}`;
+      
+      console.log("Redirecting to bridge page:", bridgeUrl);
+      
+      // Redirect to the bridge page
+      window.location.href = bridgeUrl;
+      
     } else if (response?.message) {
       setErrorMessage(response.message);
-    }
-  };
-  
-  // Function to add to cart via Ajax Cart API
-  const addToCartViaAjax = async (itemData: any, domain: string) => {
-    try {
-      // Construct the properties object for the customization details
-      const properties = {
-        'Custom Text': itemData.text,
-        'Font': itemData.fontFamily,
-        'Font Size': itemData.fontSize,
-        'Text Color': itemData.color
-      };
-      
-      // Create the form data
-      const cartFormData = {
-        id: itemData.variantId,
-        quantity: 1,
-        properties: properties
-      };
-      
-      console.log("Adding to cart via Ajax:", cartFormData);
-      
-      // Make the Ajax request to add to cart
-      const response = await fetch(`https://${domain}/cart/add.js`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(cartFormData)
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to add to cart: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      console.log("Added to cart successfully:", data);
-      
-      // Set success state
-      setAddedToCart(true);
-      setCartQuantity(prevQuantity => prevQuantity + 1);
-      
-      // Clear form
-      setCustomText("");
-      
-      // Redirect to cart page - this should now work since we've used the Ajax API
-      window.location.href = `https://${domain}/cart`;
-      
-    } catch (error) {
-      console.error("Error adding to cart:", error);
-      setErrorMessage("Failed to add item to cart. Please try again.");
     }
   };
   
