@@ -59,5 +59,3 @@ a
 ## Updating your app
 
 Whenever you push changes to your GitHub repository, Vercel will automatically rebuild and deploy your app. 
-
-deplo
