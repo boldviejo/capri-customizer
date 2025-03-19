@@ -15,8 +15,8 @@ npm install @cloudinary/url-gen @cloudinary/react
 Add Cloudinary credentials to your environment variables in `.env`:
 
 ```
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_UPLOAD_PRESET=Capri Customizer
+CLOUDINARY_CLOUD_NAME=dqnlrk9jl
+CLOUDINARY_UPLOAD_PRESET=capricustomizer
 ```
 
 ## Integration Steps
@@ -126,8 +126,8 @@ Place the CloudinaryUploader component in your form, right after the variant sel
 <Divider />
 
 <CloudinaryUploader
-  cloudName={process.env.CLOUDINARY_CLOUD_NAME}
-  uploadPreset="Capri Customizer"
+  cloudName={process.env.CLOUDINARY_CLOUD_NAME || "dqnlrk9jl"}
+  uploadPreset="capricustomizer"
   onImageUploaded={(url) => setPetPhotoUrl(url)}
   onUploadError={(error) => console.error('Upload error:', error)}
 />

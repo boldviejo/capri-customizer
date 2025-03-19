@@ -3,8 +3,8 @@ import { Page, Card, Form, TextField, Select, Button, Box, Divider } from '@shop
 import CloudinaryUploader from './CloudinaryUploader';
 
 // These would come from your environment variables
-const CLOUDINARY_CLOUD_NAME = 'your-cloud-name';
-const CLOUDINARY_UPLOAD_PRESET = 'Capri Customizer';
+const CLOUDINARY_CLOUD_NAME = 'dqnlrk9jl';
+const CLOUDINARY_UPLOAD_PRESET = 'capricustomizer';
 
 export default function PetPortraitCustomizer() {
   // Form state

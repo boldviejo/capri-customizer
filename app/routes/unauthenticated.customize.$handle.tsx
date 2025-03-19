@@ -493,8 +493,8 @@ export default function ProductCustomizer() {
                         <Divider />
                         
                         <CloudinaryUploader
-                          cloudName={process.env.CLOUDINARY_CLOUD_NAME || "your-cloud-name"}
-                          uploadPreset="Capri Customizer"
+                          cloudName={process.env.CLOUDINARY_CLOUD_NAME || "dqnlrk9jl"}
+                          uploadPreset="capricustomizer"
                           onImageUploaded={(url) => setPetPhotoUrl(url)}
                           onUploadError={(error) => console.error('Upload error:', error)}
                         />
