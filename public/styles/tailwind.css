@@ -1,0 +1,6 @@
+/* Tailwind CSS Classes */
+/* This file will be overwritten with processed Tailwind CSS during build */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities; 

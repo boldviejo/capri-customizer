@@ -8,11 +8,14 @@ import {
 } from "@remix-run/react";
 import { HeroUIProvider } from "@heroui/react";
 import type { LinksFunction } from "@remix-run/node";
-import tailwindStylesUrl from "~/styles/tailwind.css";
+
+// Import CSS files as URL imports
+import heroUiStylesHref from "@heroui/react/dist/index.css?url";
+import tailwindStylesHref from "~/styles/tailwind.css?url";
 
 export const links: LinksFunction = () => [
-  { rel: "stylesheet", href: "https://cdn.jsdelivr.net/npm/@heroui/react/dist/index.css" },
-  { rel: "stylesheet", href: tailwindStylesUrl },
+  { rel: "stylesheet", href: heroUiStylesHref },
+  { rel: "stylesheet", href: tailwindStylesHref },
 ];
 
 export default function App() {
