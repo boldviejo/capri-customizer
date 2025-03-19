@@ -249,11 +249,12 @@ export default function ProductCustomizer() {
   const submit = useSubmit();
   const actionData = useActionData();
   
-  const [customText, setCustomText] = useState("");
-  const [selectedVariantId, setSelectedVariantId] = useState("");
-  const [fontFamily, setFontFamily] = useState("Arial");
-  const [fontSize, setFontSize] = useState(16);
-  const [textColor, setTextColor] = useState("#000000");
+  const [selectedVariant, setSelectedVariant] = useState('');
+  const [selectedVariantId, setSelectedVariantId] = useState('');
+  const [customText, setCustomText] = useState('');
+  const [fontFamily, setFontFamily] = useState('Arial');
+  const [fontSize, setFontSize] = useState<number>(16);
+  const [color, setColor] = useState('#000000');
   
   // Cart state
   const [cartId, setCartId] = useState("");
@@ -261,9 +262,6 @@ export default function ProductCustomizer() {
   const [checkoutUrl, setCheckoutUrl] = useState("");
   const [addedToCart, setAddedToCart] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  
-  // Add returnUrl state
-  const [returnToCustomizer, setReturnToCustomizer] = useState(true);
   
   // Process action data when it changes
   useEffect(() => {
@@ -326,9 +324,7 @@ export default function ProductCustomizer() {
       
       try {
         // Encode all parameters for URL safety
-        const returnUrl = returnToCustomizer 
-          ? window.location.href 
-          : (data.returnUrl || '');
+        const returnUrl = '';
         
         const bridgeUrl = `https://${domain}/pages/add-to-cart-bridge?` + 
           `variant_id=${encodeURIComponent(data.variantId)}&` +
@@ -386,7 +382,7 @@ export default function ProductCustomizer() {
     formData.append("text", customText);
     formData.append("fontFamily", fontFamily);
     formData.append("fontSize", fontSize.toString());
-    formData.append("color", textColor);
+    formData.append("color", color);
     formData.append("variantId", selectedVariantId);
     formData.append("returnUrl", window.location.href);
     
@@ -518,14 +514,14 @@ export default function ProductCustomizer() {
                             {colorOptions.map((option) => (
                               <div 
                                 key={option.value}
-                                onClick={() => setTextColor(option.value)}
+                                onClick={() => setColor(option.value)}
                                 style={{
                                   width: '36px',
                                   height: '36px',
                                   backgroundColor: option.value,
                                   borderRadius: '50%',
                                   cursor: 'pointer',
-                                  border: textColor === option.value ? '3px solid #000' : '1px solid #ccc',
+                                  border: color === option.value ? '3px solid #000' : '1px solid #ccc',
                                 }}
                                 title={option.label}
                               />
@@ -539,7 +535,7 @@ export default function ProductCustomizer() {
                             style={{ 
                               fontFamily, 
                               fontSize: `${fontSize}px`, 
-                              color: textColor,
+                              color: color,
                               padding: '20px',
                               border: '1px dashed #ccc',
                               borderRadius: '8px',
@@ -554,18 +550,6 @@ export default function ProductCustomizer() {
                             {customText || "Your text will appear here"}
                           </div>
                         </Box>
-                        
-                        <div style={{ marginTop: '20px' }}>
-                          <label style={{ display: 'flex', alignItems: 'center' }}>
-                            <input
-                              type="checkbox"
-                              checked={returnToCustomizer}
-                              onChange={() => setReturnToCustomizer(!returnToCustomizer)}
-                              style={{ marginRight: '10px' }}
-                            />
-                            Return to customizer after adding to cart
-                          </label>
-                        </div>
                         
                         <Box paddingBlockStart="400">
                           <Button 
