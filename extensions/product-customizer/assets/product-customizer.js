@@ -13,7 +13,6 @@ document.addEventListener('DOMContentLoaded', function() {
   // Data attributes
   const productId = customizer.dataset.productId;
   const productHandle = customizer.dataset.productHandle;
-  const shopDomain = customizer.dataset.shop;
   
   // Current selections
   let selectedColor = '#000000'; // Default black
@@ -111,10 +110,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error('Error adding to cart:', data);
         alert(`Error: ${data.description}`);
       } else {
-        // Success - save to database
-        saveCustomization(textInput.value, fontSelect.value, parseInt(sizeSelect.value), selectedColor, productId, variantId);
-        
-        // Redirect to cart or update cart drawer
+        // Success - redirect to cart
         if (window.location.pathname.includes('/cart')) {
           window.location.reload();
         } else {
@@ -156,40 +152,5 @@ document.addEventListener('DOMContentLoaded', function() {
     // This would typically be retrieved via an AJAX call to the product JSON
     // For simplicity in this example, we'll return null and handle the error case
     return null;
-  }
-  
-  // Function to save customization to our database
-  function saveCustomization(text, fontFamily, fontSize, color, productId, variantId) {
-    // Get the app URL from the Shopify platform
-    const appUrl = 'https://capri-customizer.vercel.app';
-    
-    // Make a call to our app's backend API
-    fetch(`${appUrl}/api/customization`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({
-        text,
-        fontFamily,
-        fontSize,
-        color,
-        productId,
-        variantId,
-        shop: shopDomain
-      })
-    })
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
-        console.log('Customization saved successfully', data.customization);
-      } else {
-        console.error('Error saving customization:', data.error);
-      }
-    })
-    .catch(error => {
-      console.error('Error calling customization API:', error);
-    });
   }
 }); 
