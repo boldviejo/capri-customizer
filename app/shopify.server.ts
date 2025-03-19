@@ -1,35 +1,48 @@
-import "@shopify/shopify-app-remix/adapters/node";
-import {
-  ApiVersion,
-  AppDistribution,
-  shopifyApp,
-} from "@shopify/shopify-app-remix/server";
-import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
-import prisma from "./db.server";
+// This file contains Storefront API utilities
 
-const shopify = shopifyApp({
-  apiKey: process.env.SHOPIFY_API_KEY,
-  apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
-  apiVersion: ApiVersion.January25,
-  scopes: process.env.SCOPES?.split(","),
-  appUrl: process.env.SHOPIFY_APP_URL || "",
-  authPathPrefix: "/auth",
-  sessionStorage: new PrismaSessionStorage(prisma),
-  distribution: AppDistribution.AppStore,
-  future: {
-    unstable_newEmbeddedAuthStrategy: true,
-    removeRest: true,
-  },
-  ...(process.env.SHOP_CUSTOM_DOMAIN
-    ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
-    : {}),
-});
+/**
+ * Get the Storefront API token from environment variables
+ */
+export const getStorefrontApiToken = () => {
+  return process.env.SHOPIFY_STOREFRONT_API_TOKEN;
+};
 
-export default shopify;
-export const apiVersion = ApiVersion.January25;
-export const addDocumentResponseHeaders = shopify.addDocumentResponseHeaders;
-export const authenticate = shopify.authenticate;
-export const unauthenticated = shopify.unauthenticated;
-export const login = shopify.login;
-export const registerWebhooks = shopify.registerWebhooks;
-export const sessionStorage = shopify.sessionStorage;
+/**
+ * Get the Shopify domain from environment variables
+ */
+export const getShopifyDomain = () => {
+  return process.env.SHOPIFY_DOMAIN || "capri-dev-store.myshopify.com";
+};
+
+/**
+ * Create headers for Storefront API requests
+ */
+export const getStorefrontHeaders = () => {
+  return {
+    "Content-Type": "application/json",
+    "X-Shopify-Storefront-Access-Token": getStorefrontApiToken() || "",
+  };
+};
+
+/**
+ * Get the Storefront API URL
+ */
+export const getStorefrontApiUrl = () => {
+  return `https://${getShopifyDomain()}/api/2024-01/graphql.json`;
+};
+
+/**
+ * Execute a query against the Storefront API
+ */
+export const queryStorefrontApi = async (query: string, variables: Record<string, any> = {}) => {
+  const response = await fetch(getStorefrontApiUrl(), {
+    method: "POST",
+    headers: getStorefrontHeaders(),
+    body: JSON.stringify({
+      query,
+      variables,
+    }),
+  });
+
+  return response.json();
+};

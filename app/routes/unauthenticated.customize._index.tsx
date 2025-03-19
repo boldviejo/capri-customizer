@@ -11,12 +11,12 @@ import {
   Spinner,
 } from "@shopify/polaris";
 
-// Define the shop domain
-const SHOP_DOMAIN = "capri-dev-store.myshopify.com";
-
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: "https://unpkg.com/@shopify/polaris@11.0.0/build/esm/styles.css" },
 ];
+
+// Define the shop domain
+const SHOP_DOMAIN = "capri-dev-store.myshopify.com";
 
 interface Product {
   id: string;
@@ -35,39 +35,27 @@ interface LoaderData {
 }
 
 export const loader = async () => {
-  // Check if Storefront API token is available
-  if (!process.env.SHOPIFY_STOREFRONT_API_TOKEN) {
-    console.warn("SHOPIFY_STOREFRONT_API_TOKEN is not set, returning mock data");
-    // Return mock data when the token is not available
-    return json({
-      products: [
-        {
-          id: "gid://shopify/Product/1",
-          title: "Sample Product 1",
-          handle: "sample-product-1",
-          description: "This is a sample product that will appear when the Storefront API token is not configured.",
-          featuredImage: {
-            url: "https://via.placeholder.com/640x480",
-            altText: "Sample product image"
-          }
-        },
-        {
-          id: "gid://shopify/Product/2",
-          title: "Sample Product 2",
-          handle: "sample-product-2",
-          description: "Another sample product for demonstration purposes when the API is not available.",
-          featuredImage: {
-            url: "https://via.placeholder.com/640x480",
-            altText: "Sample product image"
-          }
-        }
-      ],
-      error: null
-    });
-  }
-
   try {
     // Get products using Storefront API
+    const query = `
+      query {
+        products(first: 20) {
+          edges {
+            node {
+              id
+              title
+              handle
+              description
+              featuredImage {
+                url
+                altText
+              }
+            }
+          }
+        }
+      }
+    `;
+
     const response = await fetch(
       `https://${SHOP_DOMAIN}/api/2024-01/graphql.json`,
       {
@@ -77,24 +65,7 @@ export const loader = async () => {
           "X-Shopify-Storefront-Access-Token": process.env.SHOPIFY_STOREFRONT_API_TOKEN || "",
         },
         body: JSON.stringify({
-          query: `
-            query {
-              products(first: 20) {
-                edges {
-                  node {
-                    id
-                    title
-                    handle
-                    description
-                    featuredImage {
-                      url
-                      altText
-                    }
-                  }
-                }
-              }
-            }
-          `,
+          query,
         }),
       }
     );
