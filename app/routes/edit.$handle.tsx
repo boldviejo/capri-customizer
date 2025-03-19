@@ -8,6 +8,7 @@ import {
   BlockStack,
   Box,
   Divider,
+  Banner,
 } from "@shopify/polaris";
 
 import { getShopifyDomain, queryStorefrontApi } from "~/shopify.server";
@@ -182,7 +183,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         console.log("Available variants:", product.variants.map(v => v.id));
         
         // Check if the variantId needs to be transformed to a Shopify gid format
-        const variantsById = product.variants.reduce((acc, v) => {
+        const variantsById = product.variants.reduce((acc: Record<string, string>, v: ProductVariant) => {
           // Extract variant numeric ID from gid format
           const numericId = v.id.replace('gid://shopify/ProductVariant/', '');
           acc[numericId] = v.id;
@@ -352,6 +353,7 @@ export default function EditCustomizer() {
   // State to track if a bridge request is pending and retry count
   const [pendingBridgeRequest, setPendingBridgeRequest] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [showConfirmation, setShowConfirmation] = useState(false);
   const maxRetries = 3;
   
   // Log all data received from loader for debugging
@@ -431,26 +433,13 @@ export default function EditCustomizer() {
           setPendingBridgeRequest(storedBridgeRequest);
           setRetryCount(storedRetryCount);
           
-          if (storedRetryCount < maxRetries) {
-            // Increment retry count
-            const newRetryCount = storedRetryCount + 1;
-            sessionStorage.setItem('retryCount', newRetryCount.toString());
-            console.log("Incrementing retry count to:", newRetryCount);
-            
-            // Increment redirect attempt counter
-            sessionStorage.setItem('redirectAttempt', (redirectAttempt + 1).toString());
-            
-            // Redirect to bridge URL
-            console.log("Retrying redirect to:", storedBridgeRequest);
-            window.location.href = storedBridgeRequest;
-          } else {
-            // Clear stored request if max retries reached
-            console.log("Max retries reached, clearing stored request");
-            sessionStorage.removeItem('pendingBridgeRequest');
-            sessionStorage.removeItem('retryCount');
-            sessionStorage.removeItem('redirectAttempt');
-            alert("Failed to update your cart after multiple attempts. Please try again.");
-          }
+          // DISABLE AUTOMATIC REDIRECT ON PAGE LOAD
+          // We'll let the user initiate the redirect after reviewing their customization
+          console.log("Stored bridge request found but not automatically redirecting");
+          
+          // Clear the stored bridge request to prevent issues on future loads
+          // but keep the URL in component state
+          sessionStorage.removeItem('pendingBridgeRequest');
         } else {
           console.log("No stored bridge request found");
         }
@@ -511,6 +500,19 @@ export default function EditCustomizer() {
     // Submit the form data to the action
     console.log("Submitting form to action handler");
     submit(formData, { method: 'post' });
+  };
+  
+  const confirmUpdate = () => {
+    if (pendingBridgeRequest) {
+      // Increment redirect attempt counter
+      if (typeof window !== 'undefined') {
+        const redirectAttempt = parseInt(sessionStorage.getItem('redirectAttempt') || '0', 10);
+        sessionStorage.setItem('redirectAttempt', (redirectAttempt + 1).toString());
+      }
+      
+      console.log("User confirmed, redirecting to bridge URL:", pendingBridgeRequest);
+      window.location.href = pendingBridgeRequest;
+    }
   };
   
   if (error) {
@@ -587,6 +589,75 @@ export default function EditCustomizer() {
             Try Again
           </Button>
         </div>
+      </div>
+    );
+  }
+  
+  if (pendingBridgeRequest) {
+    return (
+      <div className="customizer-container">
+        <div className="customizer-header">
+          <Text variant="heading2xl" as="h1">Confirm Your Customization</Text>
+          <Text as="p">Your customization is ready to be updated in your cart</Text>
+        </div>
+        
+        <Divider />
+        
+        <BlockStack gap="400">
+          <Card>
+            <BlockStack gap="400">
+              <Box padding="400">
+                <Banner
+                  title="Your customization has been prepared"
+                  tone="success"
+                >
+                  <p>Review your customization details before finalizing the update to your cart.</p>
+                </Banner>
+                
+                <div style={{ marginTop: "20px" }}>
+                  <Text variant="headingMd" as="h2">Customization Details</Text>
+                  <ul style={{ marginTop: "10px" }}>
+                    <li><strong>Product:</strong> {product?.title}</li>
+                    <li><strong>Custom Text:</strong> {initialValues.customText}</li>
+                    <li><strong>Font:</strong> {initialValues.fontFamily}</li>
+                    <li><strong>Font Size:</strong> {initialValues.fontSize}</li>
+                    <li><strong>Text Color:</strong> {initialValues.textColor}</li>
+                    <li><strong>Position:</strong> {initialValues.position || initialValues.textPosition}</li>
+                    {initialValues.petPhotoUrl && <li><strong>Pet Photo:</strong> Included</li>}
+                  </ul>
+                </div>
+                
+                <div style={{ marginTop: "20px", display: "flex", gap: "10px" }}>
+                  <Button variant="primary" onClick={confirmUpdate}>
+                    Update Cart Item
+                  </Button>
+                  <Button variant="plain" onClick={() => {
+                    // Clear the pending bridge request
+                    setPendingBridgeRequest(null);
+                    if (typeof window !== 'undefined') {
+                      sessionStorage.removeItem('pendingBridgeRequest');
+                      sessionStorage.removeItem('retryCount');
+                      sessionStorage.removeItem('redirectAttempt');
+                    }
+                  }}>
+                    Edit Again
+                  </Button>
+                  <Button variant="plain" onClick={() => {
+                    // Clear any redirect related data
+                    if (typeof window !== 'undefined') {
+                      sessionStorage.removeItem('redirectAttempt');
+                      sessionStorage.removeItem('pendingBridgeRequest');
+                      sessionStorage.removeItem('retryCount');
+                    }
+                    window.location.href = '/cart';
+                  }}>
+                    Cancel and Return to Cart
+                  </Button>
+                </div>
+              </Box>
+            </BlockStack>
+          </Card>
+        </BlockStack>
       </div>
     );
   }

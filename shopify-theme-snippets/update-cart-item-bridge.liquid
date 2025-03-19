@@ -125,6 +125,7 @@
   <script>
     // Store parameters for use throughout the script
     let params = {};
+    let operationInProgress = false;
     
     // Helper function to clear all redirect-related data
     function clearRedirectData() {
@@ -209,7 +210,22 @@
     
     // Function to update cart item
     async function updateCartItem() {
+      // Prevent duplicate updates
+      if (operationInProgress) {
+        console.log("Update operation already in progress, aborting");
+        return;
+      }
+      
+      // Set operation flag to prevent duplicates
+      operationInProgress = true;
+      
       try {
+        // Update message to show what's happening
+        document.getElementById('message').textContent = 'Preparing to update your cart...';
+        
+        // Add a short delay before processing to allow the user to see what's happening
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         // Check if we're in a redirect loop
         if (typeof sessionStorage !== 'undefined') {
           const redirectAttempt = parseInt(sessionStorage.getItem('redirectAttempt') || '0', 10);
@@ -231,6 +247,9 @@
         // Get and validate parameters
         params = getParams();
         console.log('Parameters received:', params);
+        
+        // Update message to show we got parameters
+        document.getElementById('message').textContent = 'Validating customization details...';
         
         // Validate required parameters
         if (!params.variantId) {
@@ -256,6 +275,9 @@
         
         console.log('Updating cart item with properties:', properties);
         
+        // Update message to show we're about to fetch cart
+        document.getElementById('message').textContent = 'Retrieving your current cart...';
+        
         try {
           // First, get the current cart to find the line item
           const cartResponse = await fetch('/cart.js');
@@ -266,6 +288,9 @@
           const cart = await cartResponse.json();
           console.log('Current cart:', cart);
           
+          // Update message to show we're checking the item
+          document.getElementById('message').textContent = 'Locating your item in the cart...';
+          
           // Find the item by key
           const item = cart.items.find(i => i.key === params.itemKey);
           if (!item) {
@@ -273,6 +298,9 @@
           }
           
           console.log('Found item to update:', item);
+          
+          // Update message to show we're about to update
+          document.getElementById('message').textContent = 'Updating your customized item...';
           
           // Use the Shopify Cart API to update the item
           // We need to use the line item index (1-based) for the API
@@ -285,6 +313,9 @@
           };
           
           console.log('Sending update request:', updateData);
+          
+          // Short delay to ensure the message is visible
+          await new Promise(resolve => setTimeout(resolve, 500));
           
           // Send the update request
           const updateResponse = await fetch('/cart/change.js', {
@@ -319,11 +350,17 @@
           'An unexpected error occurred while updating your cart', 
           { error: error.stack, params: params }
         );
+      } finally {
+        // Reset operation flag
+        operationInProgress = false;
       }
     }
     
-    // Start the update process
-    document.addEventListener('DOMContentLoaded', updateCartItem);
+    // Start the update process when DOM is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+      // Wait a bit to ensure the page is fully rendered before starting update
+      setTimeout(updateCartItem, 500);
+    });
   </script>
 </body>
 </html> 

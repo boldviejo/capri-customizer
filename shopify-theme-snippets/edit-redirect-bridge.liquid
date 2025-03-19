@@ -101,7 +101,12 @@
   <div class="container">
     <div class="spinner"></div>
     <div class="message">
-      Redirecting to customizer...
+      Preparing to redirect to customizer...
+    </div>
+    <div id="confirmation" style="display: none; text-align: center; margin-top: 20px;">
+      <p style="margin-bottom: 15px;">You're about to edit your customized item.</p>
+      <button id="confirm-redirect" class="button button-primary" style="margin-right: 10px;">Continue to Customizer</button>
+      <a href="/cart" class="button">Cancel and Return to Cart</a>
     </div>
     <div id="error" class="error"></div>
     <div id="debug" class="debug"></div>
@@ -161,6 +166,25 @@
       sessionStorage.removeItem('retryCount');
     }
     
+    function showConfirmation() {
+      // Hide spinner
+      document.querySelector('.spinner').style.display = 'none';
+      
+      // Update message and show confirmation buttons
+      document.querySelector('.message').textContent = 'Ready to edit your customization';
+      document.getElementById('confirmation').style.display = 'block';
+      
+      // Add event listener to the confirmation button
+      document.getElementById('confirm-redirect').addEventListener('click', function() {
+        // Increment the redirect attempt counter
+        const redirectAttempt = parseInt(sessionStorage.getItem('redirectAttempt') || '0', 10);
+        sessionStorage.setItem('redirectAttempt', (redirectAttempt + 1).toString());
+        
+        // Redirect to the target URL
+        window.location.href = targetUrl;
+      });
+    }
+    
     (function() {
       try {
         // Check for redirect loop
@@ -176,8 +200,7 @@
           return;
         }
         
-        // Increment the redirect attempt counter
-        sessionStorage.setItem('redirectAttempt', (redirectAttempt + 1).toString());
+        // Don't increment the counter here, only when user confirms
         
         // Get parameters from URL and store them globally
         allParams = {
@@ -230,12 +253,11 @@
           }
           
           // Log the final URL for debugging
-          console.log('Redirecting to edit page:', targetUrl);
+          console.log('Ready to redirect to edit page:', targetUrl);
           
-          // Redirect after a short delay to ensure logs are visible
-          setTimeout(function() {
-            window.location.href = targetUrl;
-          }, 500);
+          // Show confirmation instead of immediate redirect
+          setTimeout(showConfirmation, 500);
+          
         } catch (urlError) {
           clearRedirectLoopData();
           showError('Error forming the redirect URL', {
