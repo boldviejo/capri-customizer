@@ -15,7 +15,7 @@ This file contains important credentials and settings for the Capri Customizer a
 |---------|-------|
 | Project ID | `capri-customizer` |
 | Region | `us-central1` |
-| Service URL | `https://capri-customizer-86025189386.us-central1.run.app` |
+| Service URL | `https://capri-customizer-6sablvg6la-uc.a.run.app` |
 | GCS Bucket Name | `capri-customizer-images` |
 
 ## Environment Variables

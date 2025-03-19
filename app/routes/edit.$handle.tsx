@@ -62,7 +62,11 @@ interface ActionData {
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   try {
     const { handle } = params;
+    console.log("Received request for product handle:", handle);
+    console.log("Full request URL:", request.url);
+    
     if (!handle) {
+      console.log("Error: Product handle is missing");
       return json({ 
         error: "Product handle is required",
         initialValues: {} 
@@ -71,16 +75,21 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
     // Parse query parameters for initial values
     const url = new URL(request.url);
+    console.log("URL search params:", Object.fromEntries([...url.searchParams.entries()]));
+    
+    // Check for both snake_case and camelCase parameter formats to handle both Shopify and direct parameters
     const initialValues = {
-      customText: url.searchParams.get('custom_text') || '',
-      fontFamily: url.searchParams.get('font_family') || 'Arial',
-      fontSize: url.searchParams.get('font_size') || '16',
-      textColor: url.searchParams.get('text_color') || '#000000',
+      customText: url.searchParams.get('custom_text') || url.searchParams.get('customText') || '',
+      fontFamily: url.searchParams.get('font_family') || url.searchParams.get('fontFamily') || 'Arial',
+      fontSize: url.searchParams.get('font_size') || url.searchParams.get('fontSize') || '16',
+      textColor: url.searchParams.get('text_color') || url.searchParams.get('textColor') || '#000000',
       position: url.searchParams.get('position') || 'center',
-      petPhotoUrl: url.searchParams.get('pet_photo_url') || undefined,
-      variantId: url.searchParams.get('variant_id') || '',
-      itemKey: url.searchParams.get('item_key') || ''
+      petPhotoUrl: url.searchParams.get('pet_photo_url') || url.searchParams.get('petPhotoUrl') || undefined,
+      variantId: url.searchParams.get('variant_id') || url.searchParams.get('variantId') || '',
+      itemKey: url.searchParams.get('item_key') || url.searchParams.get('itemKey') || ''
     };
+    
+    console.log("Parsed initialValues:", initialValues);
 
     // Using Storefront API for product fetching
     const query = `
@@ -328,6 +337,9 @@ export default function EditCustomizer() {
       <div className="error-container">
         <Text variant="heading2xl" as="h1">Error</Text>
         <Text as="p">{error}</Text>
+        <pre style={{ margin: '20px 0', padding: '10px', background: '#f5f5f5', overflow: 'auto', maxWidth: '100%' }}>
+          {JSON.stringify(initialValues, null, 2)}
+        </pre>
         <div style={{ marginTop: '20px' }}>
           <Button variant="primary" onClick={() => window.location.href = '/cart'}>
             Return to Cart
@@ -340,7 +352,15 @@ export default function EditCustomizer() {
   if (!product) {
     return (
       <div className="loading-container">
-        <Text as="p">Loading...</Text>
+        <Text as="p">Loading product data...</Text>
+        {initialValues && (
+          <div style={{ marginTop: '20px' }}>
+            <Text as="p">Debugging information:</Text>
+            <pre style={{ margin: '10px 0', padding: '10px', background: '#f5f5f5', overflow: 'auto', maxWidth: '100%' }}>
+              {JSON.stringify(initialValues, null, 2)}
+            </pre>
+          </div>
+        )}
       </div>
     );
   }
