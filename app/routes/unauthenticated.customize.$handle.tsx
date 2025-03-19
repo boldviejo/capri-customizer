@@ -335,45 +335,34 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       });
     }
     
-    // Get the Shopify domain
-    const shopifyDomain = getShopifyDomain();
-    
     try {
-      // The cart ID from the API includes both the ID and the key separated by a ?
-      // Format: gid://shopify/Cart/c1-abc123...?key=abc123...
-      const cartId = cartDetails.id;
+      // Get the Shopify domain
+      const shopifyDomain = getShopifyDomain();
       
-      // Extract just the ID portion (everything before the '?')
-      const [baseId, keyPart] = cartId.split('?');
-      
-      // Get the last part of the ID after the last '/'
-      const idParts = baseId.split('/');
-      const cartToken = idParts[idParts.length - 1];
-      
-      // Extract the key value if it exists
-      let key = '';
-      if (keyPart && keyPart.startsWith('key=')) {
-        key = keyPart.substring(4); // Remove 'key=' prefix
-      } else {
-        // If we can't get the key from the ID, try to extract from checkoutUrl
-        try {
-          const checkoutUrl = new URL(cartDetails.checkoutUrl);
-          key = checkoutUrl.searchParams.get('key') || '';
-        } catch (e) {
-          console.error("Could not parse checkout URL:", e);
-        }
+      // Extract variant ID and quantity from the line items
+      const lineItems = cartDetails.lines.edges;
+      if (!lineItems || lineItems.length === 0) {
+        console.error("No line items found in cart");
+        // Fallback to checkout URL if no line items found
+        return redirect(cartDetails.checkoutUrl);
       }
       
-      // Construct the cart URL with the proper format
-      let cartUrl;
-      if (key) {
-        cartUrl = `https://${shopifyDomain}/cart/c/${cartToken}?key=${key}`;
-      } else {
-        cartUrl = `https://${shopifyDomain}/cart/c/${cartToken}`;
-      }
+      // Create a Shopify cart permalink
+      // Format: https://domain.myshopify.com/cart/{variant_id}:{quantity}
+      // For multiple items: https://domain.myshopify.com/cart/{variant_id}:{quantity},{variant_id2}:{quantity2}
       
-      console.log("Redirecting to cart URL:", cartUrl);
-      return redirect(cartUrl);
+      // Extract variant IDs and quantities from the cart
+      const itemsString = lineItems.map((item: any) => {
+        const variantId = item.node.merchandise.id.split('/').pop();
+        const quantity = item.node.quantity;
+        return `${variantId}:${quantity}`;
+      }).join(',');
+      
+      // Create the permalink URL - add 'storefront' parameter to go to cart instead of checkout
+      const permalinkUrl = `https://${shopifyDomain}/cart/${itemsString}?storefront=1`;
+      
+      console.log("Redirecting to permalink URL:", permalinkUrl);
+      return redirect(permalinkUrl);
       
     } catch (error) {
       console.error("Error constructing cart URL:", error);
