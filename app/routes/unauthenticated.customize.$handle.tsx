@@ -358,11 +358,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         return `${variantId}:${quantity}`;
       }).join(',');
       
-      // Create the permalink URL - add 'storefront' parameter to go to cart instead of checkout
-      const permalinkUrl = `https://${shopifyDomain}/cart/${itemsString}?storefront=1`;
+      // Create the permalink URL for the CART, not checkout
+      // Using direct structure for cart
+      const cartUrl = `https://${shopifyDomain}/cart/${itemsString}`;
       
-      console.log("Redirecting to permalink URL:", permalinkUrl);
-      return redirect(permalinkUrl);
+      console.log("Redirecting to cart URL:", cartUrl);
+      return redirect(cartUrl);
       
     } catch (error) {
       console.error("Error constructing cart URL:", error);
