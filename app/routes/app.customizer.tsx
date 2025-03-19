@@ -356,14 +356,14 @@ export default function ProductCustomizer() {
                       value={selectedProductId}
                     />
                     
-                    {variants.length > 0 && (
-                      <Select
-                        label="Select a variant"
-                        options={variantOptions}
-                        onChange={setSelectedVariantId}
-                        value={selectedVariantId}
-                      />
-                    )}
+                    <Select
+                      label="Select a variant"
+                      options={variantOptions}
+                      onChange={setSelectedVariantId}
+                      value={selectedVariantId}
+                      disabled={variants.length === 0}
+                      helpText={variants.length === 0 ? "Select a product first to see available variants" : ""}
+                    />
                     
                     <Divider />
                     
@@ -397,16 +397,16 @@ export default function ProductCustomizer() {
                     />
                     
                     <Box paddingBlockStart="400">
-                      <InlineStack gap="300" align="end">
-                        <Button 
-                          variant="primary" 
-                          onClick={handleSubmit}
-                          loading={isLoading}
-                          disabled={!customText || !selectedProductId || !selectedVariantId}
-                        >
-                          Save & Add to Cart
-                        </Button>
-                      </InlineStack>
+                      <Button 
+                        variant="primary" 
+                        onClick={handleSubmit}
+                        loading={isLoading}
+                        disabled={!customText || !selectedProductId || !selectedVariantId}
+                        size="large"
+                        fullWidth
+                      >
+                        Save & Add to Cart
+                      </Button>
                     </Box>
                   </BlockStack>
                 </Box>
